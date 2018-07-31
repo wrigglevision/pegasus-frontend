@@ -285,10 +285,8 @@ void MetadataParser::parseGameEntry(QXmlStreamReader& xml,
 
         xml_props[map_iter->second] = xml.readElementText();
     }
-    if (xml.error()) {
-        qWarning().noquote() << MSG_PREFIX << xml.errorString();
+    if (xml.error())
         return;
-    }
 
     // check if all required params are present
     QString& game_path = xml_props[MetaTypes::PATH];

@@ -173,10 +173,8 @@ void SystemsParser::readSystemEntry(QXmlStreamReader& xml,
         else
             xml.skipCurrentElement();
     }
-    if (xml.error()) {
-        qWarning().noquote() << MSG_PREFIX << xml.errorString();
+    if (xml.error())
         return;
-    }
 
     // check if all required params are present
     for (const auto& key : required_keys) {
