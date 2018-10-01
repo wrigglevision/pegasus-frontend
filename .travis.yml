@@ -3,14 +3,15 @@ language: cpp
 sudo: required
 dist: trusty
 
-branches:
-  only:
-  - master
-
 env:
   global:
   - TOOLS_URL=https://github.com/mmatyas/pegasus-frontend/releases/download/alpha1
   - QT_VER=qt5111
+
+branches:
+  only:
+    - master
+    - sonarcloud
 
 git:
   depth: 100
@@ -100,32 +101,32 @@ deploy:
 
 jobs:
   include:
-  - env: TARGET=x11-static
-  - env: TARGET=rpi1-static
-  - env: TARGET=rpi2-static
+  #- env: TARGET=x11-static
+  #- env: TARGET=rpi1-static
+  #- env: TARGET=rpi2-static
 
   # Collect and deploy artifacts
-  - stage: deploy
-    before_install: skip
-    install: skip
-    before_script: skip
-    script:
-      - export GIT_REV=$(git describe --always)
-      - export STAGING_REPO=https://github.com/mmatyas/pegasus-deploy-staging.git
-      - export TARGETS='x11-static rpi1-static rpi2-static'
-      - for target in $TARGETS; do
-          git clone $STAGING_REPO -b continuous-${target} dist-${target};
-        done
-      - export FILES=$(find ./ -maxdepth 2 -name "*.zip" -or -name "*.deb")
-      - export FILE_CNT=$(echo $FILES | wc -w)
-      - export EXPECTED_FILE_CNT=4 # 3 target + deb
-      - if [[ $FILE_CNT -ne $EXPECTED_FILE_CNT ]]; then return 1; fi
-    after_success:
-      - wget https://github.com/mmatyas/uploadtool/raw/master/upload.sh
-      - bash ./upload.sh $FILES
-    deploy: null
+#  - stage: deploy
+#    before_install: skip
+#    install: skip
+#    before_script: skip
+#    script:
+#      - export GIT_REV=$(git describe --always)
+#      - export STAGING_REPO=https://github.com/mmatyas/pegasus-deploy-staging.git
+#      - export TARGETS='x11-static rpi1-static rpi2-static'
+#      - for target in $TARGETS; do
+#          git clone $STAGING_REPO -b continuous-${target} dist-${target};
+#        done
+#      - export FILES=$(find ./ -maxdepth 2 -name "*.zip" -or -name "*.deb")
+#      - export FILE_CNT=$(echo $FILES | wc -w)
+#      - export EXPECTED_FILE_CNT=4 # 3 target + deb
+#      - if [[ $FILE_CNT -ne $EXPECTED_FILE_CNT ]]; then return 1; fi
+#    after_success:
+#      - wget https://github.com/mmatyas/uploadtool/raw/master/upload.sh
+#      - bash ./upload.sh $FILES
+#    deploy: null
 
-  # Qt 5.7.1 (for Debian Stretch/Ubuntu Zesty)
+  # Qt 5.8 (for Debian Stretch/Ubuntu Zesty)
   - stage: test
     env: QT_QPA_PLATFORM=minimal
     before_install:
@@ -165,3 +166,38 @@ jobs:
       - cd ..
       - coveralls-lcov build/coverage.clean
     deploy: null
+
+  # SonarCloud
+  - stage: test
+    env: TARGET=x11-static COVFLAGS="-g -O0 --coverage -fprofile-arcs -ftest-coverage" QT_QPA_PLATFORM=minimal
+    before_install:
+      - sudo add-apt-repository -y ppa:beineri/opt-qt58-trusty
+      - sudo apt-get update
+    install:
+      - sudo apt-get install -y
+          lcov
+          qt58declarative
+          qt58graphicaleffects
+          qt58gamepad
+          qt58imageformats
+          qt58multimedia
+          qt58svg
+          qt58tools
+          libpulse-dev
+      - source /opt/qt58/bin/qt58-env.sh
+      - qmake -v
+    script:
+      - git fetch --unshallow
+      - qmake
+          QMAKE_CXXFLAGS="$COVFLAGS"
+          QMAKE_LDFLAGS="$COVFLAGS"
+          LIBS+="-lgcov"
+          CONFIG+=debug
+      - build-wrapper-linux-x86-64 --out-dir bw-output make clean all check
+      - shopt -s globstar && for i in **/*.gcda; do gcov -p -o $(dirname $i) $i; done
+    after_success:
+      - sonar-scanner -Dsonar.projectVersion="$TRAVIS_COMMIT"
+    deploy: null
+    addons:
+      sonarcloud:
+        organization: "mmatyas-github"
