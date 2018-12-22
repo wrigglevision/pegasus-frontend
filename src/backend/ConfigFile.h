@@ -17,7 +17,10 @@
 
 #pragma once
 
+#include "utils/NoCopyNoMove.h"
+
 #include <QString>
+#include <QVector>
 #include <functional>
 
 class QFile;
@@ -26,21 +29,34 @@ class QTextStream;
 
 namespace config {
 
-/// Read and parse the stream, calling the callbacks if necessary
-/// - onAttributeFound(line, key, value)
+struct Entry {
+    int line;
+    QString key;
+    QVector<QString> values;
+
+    void reset();
+};
+
+/// Read and parse the stream, calling the callbacks when necessary
+/// - onAttributeFound(line, key, lines)
 /// - onError(line, message)
 void readStream(QTextStream& stream,
-                const std::function<void(const int, const QString, const QString)>& onAttributeFound,
+                const std::function<void(const Entry&)>& onAttributeFound,
                 const std::function<void(const int, const QString)>& onError);
 
 /// Opens the file at the path, then calls the stream reading on it
 void readFile(const QString& path,
-              const std::function<void(const int, const QString, const QString)>& onAttributeFound,
+              const std::function<void(const Entry&)>& onAttributeFound,
               const std::function<void(const int, const QString)>& onError);
 
 /// Calls the stream reading on an already open, readable text file
 void readFile(QFile& file,
-              const std::function<void(const int, const QString, const QString)>& onAttributeFound,
+              const std::function<void(const Entry&)>& onAttributeFound,
               const std::function<void(const int, const QString)>& onError);
+
+
+/// Creates a single text from the separate lines. Lines are expected to be
+/// trimmed, or contain only a single line break.
+QString mergeLines(const QVector<QString>&);
 
 } // namespace config

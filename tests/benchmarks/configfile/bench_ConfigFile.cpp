@@ -28,18 +28,18 @@ private slots:
     void file();
 
 private:
-    QVector<QPair<QString, QString>> m_entries;
+    QVector<config::Entry> m_entries;
 
-    void onAttributeFound(const QString&, const QString&);
+    void onAttributeFound(const config::Entry&);
     void onError(int, const QString&);
 
     void readStream(QTextStream&);
 };
 
 
-void bench_ConfigFile::onAttributeFound(const QString& key, const QString& val)
+void bench_ConfigFile::onAttributeFound(const config::Entry& entry)
 {
-    m_entries.push_back(qMakePair(key, val));
+    m_entries.push_back(entry);
 }
 
 void bench_ConfigFile::onError(int linenum, const QString& msg)
@@ -51,7 +51,7 @@ void bench_ConfigFile::onError(int linenum, const QString& msg)
 void bench_ConfigFile::readStream(QTextStream& stream)
 {
     config::readStream(stream,
-        [this](const int, const QString key, const QString val){ this->onAttributeFound(key, val); },
+        [this](const config::Entry& entry){ this->onAttributeFound(entry); },
         [this](const int linenum, const QString msg){ this->onError(linenum, msg); });
 }
 
@@ -74,7 +74,7 @@ void bench_ConfigFile::file()
         QTest::ignoreMessage(QtWarningMsg, QRegularExpression("line 9: .*"));
 
         config::readFile(":/test.cfg",
-            [this](const int, const QString key, const QString val){ this->onAttributeFound(key, val); },
+            [this](const config::Entry& entry){ this->onAttributeFound(entry); },
             [this](const int linenum, const QString msg){ this->onError(linenum, msg); });
     }
 }

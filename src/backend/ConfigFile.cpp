@@ -28,8 +28,15 @@
 
 namespace config {
 
+void Entry::reset()
+{
+    line = 0;
+    key.clear();
+    values.clear();
+}
+
 void readFile(const QString& path,
-              const std::function<void(const int, const QString, const QString)>& onAttributeFound,
+              const std::function<void(const Entry&)>& onAttributeFound,
               const std::function<void(const int, const QString)>& onError)
 {
     QFile file(path);
@@ -41,7 +48,7 @@ void readFile(const QString& path,
 }
 
 void readFile(QFile& file,
-              const std::function<void(const int, const QString, const QString)>& onAttributeFound,
+              const std::function<void(const Entry&)>& onAttributeFound,
               const std::function<void(const int, const QString)>& onError)
 {
     Q_ASSERT(file.isOpen() && file.isReadable());
@@ -50,30 +57,27 @@ void readFile(QFile& file,
 }
 
 void readStream(QTextStream& stream,
-                const std::function<void(const int, const QString, const QString)>& onAttributeFound,
+                const std::function<void(const Entry&)>& onAttributeFound,
                 const std::function<void(const int, const QString)>& onError)
 {
-    const QRegularExpression rx_keyval(QStringLiteral(R"(^([^:]+):(.*)$)")); // key = value
+    constexpr auto EMPTY_LINE_MARK = QChar('.');
+    const QRegularExpression rx_keyval(QStringLiteral(R"(^([^:]+):(.*)$)")); // key: value
 
-    QString last_key;
-    QString last_val;
-    int linenum = 0;
-    int last_key_linenum = 0;
+    Entry entry;
+    entry.reset();
 
     const auto close_current_attrib = [&](){
-        if (!last_key.isEmpty()) {
-            last_val = last_val.trimmed();
-
-            if (last_val.isEmpty())
-                onError(last_key_linenum, tr_log("attribute value missing, entry ignored"));
+        if (!entry.key.isEmpty()) {
+            if (entry.values.isEmpty())
+                onError(entry.line, tr_log("attribute value missing, entry ignored"));
             else
-                onAttributeFound(last_key_linenum, last_key, last_val);
+                onAttributeFound(entry);
         }
 
-        last_key.clear();
-        last_val.clear();
+        entry.reset();
     };
 
+    int linenum = 0;
     QString line;
     while (stream.readLineInto(&line)) {
         linenum++;
@@ -82,37 +86,42 @@ void readStream(QTextStream& stream,
             continue;
 
         const QStringRef trimmed_line = line.leftRef(-1).trimmed();
-        if (trimmed_line.isEmpty()) {
-            last_val.append('\n');
-            continue;
-        }
 
         // multiline (starts with whitespace but trimmed_line is not empty)
         if (line.at(0).isSpace()) {
-            if (last_key.isEmpty()) {
-                onError(linenum, tr_log("multiline value found, but no attribute has been defined yet"));
+            if (entry.key.isEmpty()) {
+                onError(linenum, tr_log("line starts with whitespace, but no attribute has been defined yet"));
                 continue;
             }
 
-            if (!last_val.endsWith('\n'))
-                last_val.append(' ');
+            if (trimmed_line == EMPTY_LINE_MARK) {
+                entry.values.append(QStringLiteral("\n"));
+                continue;
+            }
 
-            last_val.append(trimmed_line);
+            entry.values.append(trimmed_line.toString());
             continue;
         }
 
         // either a new entry or error - in both cases, the previous entry should be closed
         close_current_attrib();
 
+        // empty line, skip
+        if (trimmed_line.isEmpty())
+            continue;
+
         // keyval pair (after the multiline check)
         const auto rx_keyval_match = rx_keyval.match(trimmed_line);
         if (rx_keyval_match.hasMatch()) {
             // the key is never empty if the regex matches the *trimmed* line
-            last_key = rx_keyval_match.capturedRef(1).trimmed().toString().toLower();
-            Q_ASSERT(!last_key.isEmpty());
-            last_key_linenum = linenum;
+            entry.key = rx_keyval_match.capturedRef(1).trimmed().toString().toLower();
+
             // the value can be empty here, if it's purely multiline
-            last_val = rx_keyval_match.capturedRef(2).trimmed().toString();
+            auto value_part = rx_keyval_match.capturedRef(2).trimmed();
+            if (!value_part.isEmpty())
+                entry.values.append(value_part.toString());
+
+            entry.line = linenum;
             continue;
         }
 
@@ -123,6 +132,35 @@ void readStream(QTextStream& stream,
     // the very last line
     linenum++;
     close_current_attrib();
+}
+
+
+QString mergeLines(const QVector<QString>& lines)
+{
+    if (lines.isEmpty())
+        return {};
+
+
+    constexpr QChar SPACE(' ');
+    constexpr QChar NEWLINE('\n');
+
+    int len = 0;
+    for (const QString& line : lines)
+        len += line.length() + 1; // +1 for likely space
+
+    QString out;
+    out.reserve(len);
+
+    auto it = lines.cbegin();
+    out += *it++;
+    while (it != lines.cend()) {
+        if (!out.endsWith(NEWLINE) && !it->startsWith(NEWLINE))
+            out += SPACE;
+
+        out += *it++;
+    }
+
+    return out.trimmed();
 }
 
 } // namespace config
