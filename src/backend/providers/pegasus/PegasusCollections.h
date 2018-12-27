@@ -28,7 +28,8 @@
 namespace providers {
 namespace pegasus {
 
-enum class CollAttribType : unsigned char;
+enum class CollAttrib : unsigned char;
+enum class GameAttrib : unsigned char;
 
 class PegasusCollections {
 public:
@@ -41,7 +42,8 @@ public:
                       const std::function<void(int)>&) const;
 
 private:
-    const HashMap<QString, CollAttribType> m_key_types;
+    const HashMap<QString, CollAttrib> m_coll_attribs;
+    const HashMap<QString, GameAttrib> m_game_attribs;
 };
 
 } // namespace pegasus

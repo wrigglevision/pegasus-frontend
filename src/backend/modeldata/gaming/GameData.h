@@ -25,21 +25,29 @@
 #include <QFileInfo>
 #include <QString>
 #include <QStringList>
+#include <QVector>
 
 
 namespace modeldata {
 
+struct GameFile {
+    QString name;
+    QFileInfo fileinfo;
+
+    MOVE_ONLY(GameFile)
+};
+
 struct Game {
-    explicit Game(QFileInfo fileinfo);
+    explicit Game(QString title);
     MOVE_ONLY(Game)
 
-    const QFileInfo& fileinfo() const { return m_fileinfo; }
-
-    QString title;
+    const QString title;
     QString summary;
     QString description;
+
     QString launch_cmd;
     QString launch_workdir;
+    QVector<GameFile> files;
 
     int player_count;
     bool is_favorite;
@@ -54,11 +62,7 @@ struct Game {
     QStringList publishers;
     QStringList genres;
 
-    HashMap<QString, QString> extra; // TODO: remove
     GameAssets assets;
-
-private:
-    QFileInfo m_fileinfo;
 };
 
 } // namespace modeldata

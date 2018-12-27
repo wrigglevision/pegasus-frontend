@@ -29,15 +29,15 @@ class test_PegasusProvider : public QObject {
     Q_OBJECT
 
 private slots:
-    void find_in_empty_dir();
-    void find_in_filled_dir();
-    void enhance();
-    void asset_search();
+    void empty();
+    void simple();
+    void with_meta();
+    /*void asset_search();
     void custom_assets();
-    void custom_directories();
+    void custom_directories();*/
 };
 
-void test_PegasusProvider::find_in_empty_dir()
+void test_PegasusProvider::empty()
 {
     HashMap<QString, modeldata::Game> games;
     HashMap<QString, modeldata::Collection> collections;
@@ -51,46 +51,46 @@ void test_PegasusProvider::find_in_empty_dir()
     QVERIFY(collection_childs.empty());
 }
 
-void test_PegasusProvider::find_in_filled_dir()
+void test_PegasusProvider::simple()
 {
     HashMap<QString, modeldata::Game> games;
     HashMap<QString, modeldata::Collection> collections;
     HashMap<QString, std::vector<QString>> collection_childs;
 
-    QTest::ignoreMessage(QtInfoMsg, "Collections: found `:/filled/collections.txt`");
-    providers::pegasus::PegasusProvider provider({QStringLiteral(":/filled")});
+    QTest::ignoreMessage(QtInfoMsg, "Collections: found `:/simple/metadata.pegasus.txt`");
+    providers::pegasus::PegasusProvider provider({QStringLiteral(":/simple")});
     provider.findLists(games, collections, collection_childs);
 
     // finds the correct collections
-    QVERIFY(collections.size() == 3);
+    QCOMPARE(static_cast<int>(collections.size()), 3);
     QVERIFY(collections.count(QStringLiteral("My Games")));
     QVERIFY(collections.count(QStringLiteral("Favorite games")));
     QVERIFY(collections.count(QStringLiteral("Multi-game ROMs")));
 
     // finds the correct amount of games
-    QVERIFY(games.size() == 8);
+    QCOMPARE(static_cast<int>(games.size()), 8);
     QVERIFY(collection_childs.at(QStringLiteral("My Games")).size() == 8);
     QVERIFY(collection_childs.at(QStringLiteral("Favorite games")).size() == 3);
     QVERIFY(collection_childs.at(QStringLiteral("Multi-game ROMs")).size() == 1);
 
     // finds the correct files for the collections
     const QStringList mygames_paths {
-        { ":/filled/mygame1.ext" },
-        { ":/filled/mygame2.ext" },
-        { ":/filled/mygame3.ext" },
-        { ":/filled/favgame1.ext" },
-        { ":/filled/favgame2.ext" },
-        { ":/filled/game with spaces.ext" },
-        { ":/filled/9999-in-1.ext" },
-        { ":/filled/subdir/game_in_subdir.ext" },
+        { ":/simple/mygame1.ext" },
+        { ":/simple/mygame2.ext" },
+        { ":/simple/mygame3.ext" },
+        { ":/simple/favgame1.ext" },
+        { ":/simple/favgame2.ext" },
+        { ":/simple/game with spaces.ext" },
+        { ":/simple/9999-in-1.ext" },
+        { ":/simple/subdir/game_in_subdir.ext" },
     };
     const QStringList faves_paths {
-        { ":/filled/favgame1.ext" },
-        { ":/filled/favgame2.ext" },
-        { ":/filled/game with spaces.ext" },
+        { ":/simple/favgame1.ext" },
+        { ":/simple/favgame2.ext" },
+        { ":/simple/game with spaces.ext" },
     };
     const QStringList multi_paths {
-        { ":/filled/9999-in-1.ext" },
+        { ":/simple/9999-in-1.ext" },
     };
     for (const QString& game_key : collection_childs.at(QStringLiteral("My Games"))) {
         const modeldata::Game& game = games.at(game_key);
@@ -106,22 +106,21 @@ void test_PegasusProvider::find_in_filled_dir()
     }
 }
 
-void test_PegasusProvider::enhance()
+void test_PegasusProvider::with_meta()
 {
     HashMap<QString, modeldata::Game> games;
     HashMap<QString, modeldata::Collection> collections;
     HashMap<QString, std::vector<QString>> collection_childs;
 
-    QTest::ignoreMessage(QtInfoMsg, "Collections: found `:/with_meta/collections.txt`");
-    QTest::ignoreMessage(QtInfoMsg, "Collections: found `:/with_meta/metadata.txt`");
-    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("`:/with_meta/metadata.txt`, line \\d: no file defined yet.*"));
+    QTest::ignoreMessage(QtInfoMsg, "Collections: found `:/with_meta/metadata.pegasus.txt`");
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression("`:/with_meta/metadata.pegasus.txt`, line \\d: no file defined yet.*"));
     providers::pegasus::PegasusProvider provider({QStringLiteral(":/with_meta")});
     provider.findLists(games, collections, collection_childs);
-    provider.findStaticData(games, collections, collection_childs);
+    //provider.findStaticData(games, collections, collection_childs);
 
     const QString collection_name(QStringLiteral("mygames"));
-    QVERIFY(collections.size() == 1);
-    QVERIFY(collections.count(collection_name) == 1);
+    QCOMPARE(static_cast<int>(collections.size()), 1);
+    QVERIFY(collections.count(collection_name));
     QCOMPARE(collections.at(collection_name).summary, QStringLiteral("this is the summary"));
     QCOMPARE(collections.at(collection_name).description, QStringLiteral("this is the description"));
 
@@ -151,7 +150,7 @@ void test_PegasusProvider::enhance()
     QCOMPARE(games.at(game_key).release_date, QDate(1998, 5, 1));
 }
 
-void test_PegasusProvider::asset_search()
+/*void test_PegasusProvider::asset_search()
 {
     HashMap<QString, modeldata::Game> games;
     HashMap<QString, modeldata::Collection> collections;
@@ -246,7 +245,7 @@ void test_PegasusProvider::custom_directories()
         const modeldata::Game& game = games.at(game_key);
         QCOMPARE(yfiles.contains(game.fileinfo().canonicalFilePath()), true);
     }
-}
+}*/
 
 
 QTEST_MAIN(test_PegasusProvider)

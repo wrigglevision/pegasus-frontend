@@ -154,8 +154,9 @@ void PegasusMetadata::read_metadata_file(const QString& dir_path,
         qWarning().noquote() << MSG_PREFIX
             << tr_log("`%1`, line %2: %3").arg(curr_config_path, QString::number(lineno), msg);
     };
-    const auto on_attribute = [&](const int lineno, const QString key, const QString val){
-        if (key == QLatin1String("file")) {
+    const auto on_attribute = [&](const config::Entry& entry){
+        if (entry.key == QLatin1String("file")) {
+            const QString val = config::mergeLines(entry.values);
             QFileInfo finfo(val);
             if (finfo.isRelative())
                 finfo.setFile(dir_path % '/' % val);
@@ -164,7 +165,7 @@ void PegasusMetadata::read_metadata_file(const QString& dir_path,
 
             const auto it = games.find(finfo.canonicalFilePath());
             if (it == games.cend()) {
-                on_error(lineno,
+                on_error(entry.line,
                     tr_log("the game `%1` is either missing or excluded, values for it will be ignored").arg(val));
                 return;
             }
@@ -173,40 +174,40 @@ void PegasusMetadata::read_metadata_file(const QString& dir_path,
             return;
         }
         if (!curr_game) {
-            on_error(lineno, tr_log("no file defined yet, entry ignored"));
+            on_error(entry.line, tr_log("no file defined yet, entry ignored"));
             return;
         }
 
-        if (key.startsWith(QLatin1String("x-"))) {
+        if (entry.key.startsWith(QLatin1String("x-"))) {
             // TODO: unimplemented
             return;
         }
 
-        const auto rx_asset = rx_asset_key.match(key);
+        const auto rx_asset = rx_asset_key.match(entry.key);
         if (rx_asset.hasMatch()) {
             const QString asset_key = rx_asset.captured(1);
             const AssetType asset_type = pegasus_assets::str_to_type(asset_key);
             if (asset_type == AssetType::UNKNOWN) {
-                on_error(lineno, tr_log("unknown asset type '%1', entry ignored").arg(asset_key));
+                on_error(entry.line, tr_log("unknown asset type '%1', entry ignored").arg(asset_key));
                 return;
             }
 
-            add_asset(curr_game->assets, asset_type, val, dir_path);
+            add_asset(curr_game->assets, asset_type, config::mergeLines(entry.values), dir_path);
             return;
         }
 
-        if (!m_key_types.count(key)) {
-            on_error(lineno, tr_log("unrecognized attribute name `%3`, ignored").arg(key));
+        if (!m_key_types.count(entry.key)) {
+            on_error(entry.line, tr_log("unrecognized attribute name `%3`, ignored").arg(entry.key));
             return;
         }
-        switch (m_key_types.at(key)) {
+        switch (m_key_types.at(entry.key)) {
             case MetaAttribType::TITLE:
-                curr_game->title = val;
+                curr_game->title = config::mergeLines(entry.values);
                 break;
             case MetaAttribType::DEVELOPER:
-                curr_game->developers.append(val);
+                curr_game->developers.append(config::mergeLines(entry.values));
                 break;
-            case MetaAttribType::PUBLISHER:
+            /*case MetaAttribType::PUBLISHER:
                 curr_game->publishers.append(val);
                 break;
             case MetaAttribType::GENRE:
@@ -232,7 +233,7 @@ void PegasusMetadata::read_metadata_file(const QString& dir_path,
                 {
                     const auto rx_match = m_release_regex.match(val);
                     if (!rx_match.hasMatch()) {
-                        on_error(lineno, tr_log("incorrect date format, should be YYYY(-MM(-DD))"));
+                        on_error(entry.line, tr_log("incorrect date format, should be YYYY(-MM(-DD))"));
                         return;
                     }
 
@@ -262,7 +263,7 @@ void PegasusMetadata::read_metadata_file(const QString& dir_path,
                 break;
             case MetaAttribType::LAUNCH_WORKDIR:
                 curr_game->launch_workdir = val;
-                break;
+                break;*/
         }
     };
 

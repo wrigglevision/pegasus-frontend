@@ -1,0 +1,42 @@
+collection: mygames
+extensions: ext
+summary: this is the summary
+description: this is the description
+
+
+# Test basic metadata
+game: A simple game
+file: basic.ext
+# repeating multi keys will append
+developer: Dev
+developer: Dev with Spaces
+genres:
+  genre1
+  genre2
+  genre with spaces
+players: 2-4
+rating: 80%
+# repeating single keys will overwrite
+release: 1998
+release: 1998-05
+x-something: ignored
+description: a very
+  long
+  .
+  description
+
+
+game: Subdir Game
+file: subdir/game_in_subdir.ext
+
+
+# Test multiple files
+game: Multifile Game
+files:
+  multi.a.ext
+  multi.b.ext
+
+
+# Test launch-only entries
+game: Virtual Game
+launch: runme.exe param1 param2

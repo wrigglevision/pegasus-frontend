@@ -15,19 +15,28 @@
 // along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 
-#include "GameData.h"
+#pragma once
 
+#include "providers/pegasus/PegasusProvider.h"
+#include "providers/pegasus_favorites/Favorites.h"
+#include "providers/pegasus_playtime/PlaytimeStats.h"
 
-namespace modeldata {
+#ifdef WITH_COMPAT_ES2
+  #include "providers/es2/Es2Provider.h"
+#endif
 
-Game::Game(QString title)
-    : title(title)
-    , player_count(1)
-    , is_favorite(false)
-    , rating(0.f)
-    , playcount(0)
-    , playtime(0)
-{
-}
+#ifdef WITH_COMPAT_STEAM
+  #include "providers/steam/SteamProvider.h"
+#endif
 
-} // namespace modeldata
+#ifdef WITH_COMPAT_GOG
+  #include "providers/gog/GogProvider.h"
+#endif
+
+#ifdef WITH_COMPAT_ANDROIDAPPS
+  #include "providers/android_apps/AndroidAppsProvider.h"
+#endif
+
+#ifdef WITH_COMPAT_SKRAPER
+  #include "providers/skraper/SkraperAssetsProvider.h"
+#endif
