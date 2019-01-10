@@ -70,25 +70,7 @@ static constexpr auto MSG_PREFIX = "Collections:";
 using CollAttrib = providers::pegasus::CollAttrib;
 using GameAttrib = providers::pegasus::GameAttrib;
 
-struct GameFilterGroup {
-    QStringList extensions;
-    QStringList files;
-    QString regex;
-};
-struct GameFilter {
-    QString parent_collection;
-    QStringList directories;
-    GameFilterGroup include;
-    GameFilterGroup exclude;
-    QStringList extra;
-
-    GameFilter(QString parent, QString base_dir)
-        : parent_collection(parent)
-        , directories(base_dir)
-    {}
-};
-
-struct ParserContext {
+/*struct ParserContext {
     const QRegularExpression rx_asset_key(QStringLiteral(R"(^assets?\.(.+)$)"));
 
     QString curr_dir;
@@ -108,84 +90,7 @@ struct ParserContext {
             << tr_log("`%1`, line %2: %3")
                       .arg(curr_config_path, QString::number(lineno), msg);
     }
-};
-
-void parse_collection_attrib(ParserContext& ctx, const config::Entry& entry)
-{
-    if (!ctx.curr_coll) {
-        ctx.print_error(entry.line, tr_log("no collection defined yet, entry ignored"));
-        return;
-    }
-
-    if (entry.key.startsWith(QLatin1String("x-")))
-        return;
-
-    const auto rx_asset = ctx.rx_asset_key.match(entry.key);
-    if (rx_asset.hasMatch()) {
-        const QString asset_key = rx_asset.captured(1);
-        const AssetType asset_type = pegasus_assets::str_to_type(asset_key);
-        if (asset_type == AssetType::UNKNOWN) {
-            ctx.print_error(entry.line, tr_log("unknown asset type '%1', entry ignored").arg(asset_key));
-            return;
-        }
-
-        providers::pegasus::add_asset(ctx.curr_coll->default_assets, asset_type,
-                                      entry.values.first(), ctx.curr_dir);
-        return;
-    }
-
-    if (!key_types.count(entry.key)) {
-        on_error(entry.line, tr_log("unrecognized attribute name `%3`, ignored").arg(entry.key));
-        return;
-    }
-
-    GameFilter& filter = filters.back();
-    GameFilterGroup& filter_group = entry.key.startsWith(QLatin1String("ignore-"))
-        ? filter.exclude
-        : filter.include;
-
-    switch (key_types.at(entry.key)) {
-        case CollAttrib::SHORT_NAME:
-            ctx.curr_coll->setShortName(entry.values.first());
-            break;
-        case CollAttrib::LAUNCH_CMD:
-            ctx.curr_coll->launch_cmd = config::mergeLines(entry.values);
-            break;
-        case CollAttrib::DIRECTORIES:
-            for (const QString& value : entry.values) {
-                QFileInfo finfo(value);
-                if (finfo.isRelative())
-                    finfo.setFile(ctx.curr_dir % '/' % value);
-
-                filter.directories.append(finfo.canonicalFilePath());
-            }
-            break;
-        case CollAttrib::EXTENSIONS:
-            filter_group.extensions.append(providers::pegasus::tokenize(config::mergeLines(entry.values).toLower()));
-            break;
-        case CollAttrib::FILES:
-            for (const QString& value : entry.values)
-                filter_group.files.append(value);
-            break;
-        case CollAttrib::REGEX:
-            filter_group.regex = entry.values.first();
-            break;
-        case CollAttrib::SHORT_DESC:
-            ctx.curr_coll->summary = config::mergeLines(entry.values);
-            break;
-        case CollAttrib::LONG_DESC:
-            ctx.curr_coll->description = config::mergeLines(entry.values);
-            break;
-        case CollAttrib::LAUNCH_WORKDIR:
-            ctx.curr_coll->launch_workdir = entry.values.first();
-            break;
-    }
-}
-
-void parse_game_attrib(const config::Entry& entry)
-{
-
-}
+};*/
 
 
 
@@ -197,63 +102,6 @@ std::vector<GameFilter> read_collections_file(const HashMap<QString, CollAttrib>
     // including keys: extensions, files, regex
     // excluding keys: ignore-extensions, ignore-files, ignore-regex
     // optional: name, launch, directories
-
-
-    const QLatin1String COLLECTION("collection");
-
-
-
-
-    const auto on_error = [&](const int lineno, const QString msg){
-        qWarning().noquote() << MSG_PREFIX
-            << tr_log("`%1`, line %2: %3")
-                      .arg(curr_config_path, QString::number(lineno), msg);
-    };
-    const auto on_attribute = [&](const config::Entry& entry){
-        if (entry.key == COLLECTION) {
-            const QString& name = entry.values.first();
-
-            curr_coll = nullptr;
-            if (!collections.count(name))
-                collections.emplace(name, modeldata::Collection(name));
-
-            curr_coll = &collections.at(name);
-            filters.emplace_back(name, dir_path);
-
-            current_parser = parse_collection_attrib;
-            return;
-        }
-
-
-
-
-
-
-
-    };
-
-
-    // the actual reading
-
-    const QStringList possible_paths {
-        dir_path + QStringLiteral("/metadata.pegasus.txt"),
-        dir_path + QStringLiteral("/collections.pegasus.txt"),
-        dir_path + QStringLiteral("/metadata.txt"),
-        dir_path + QStringLiteral("/collections.txt"),
-    };
-    for (const QString& path : possible_paths) {
-        if (!::validFile(path))
-            continue;
-
-        qInfo().noquote() << MSG_PREFIX << tr_log("found `%1`").arg(path);
-
-        curr_coll = nullptr;
-        curr_config_path = path;
-        config::readFile(path, on_attribute, on_error);
-
-        // NOTE: Temporarily turned off while moving to the new format
-        // break; // if the first file exists, don't check the other
-    }
 
     // cleanup and return
 
@@ -327,6 +175,441 @@ void process_filter(const GameFilter& filter,
     }
 }
 
+
+
+const QString& entry_first_line(const config::Entry& entry)
+{
+    Q_ASSERT(!entry.key.isEmpty());
+    Q_ASSERT(!entry.values.isEmpty());
+
+    if (entry.values.count() > 1) {
+        qWarning().noquote() << MSG_PREFIX
+            << tr_log("Expected single line value for `%1`but got more. The rest of the lines will be ignored.")
+               .arg(entry.key);
+    }
+
+    return entry.values.first();
+}
+
+QString find_metafile_in(const QString& dir_path)
+{
+    const QString possible_paths[] {
+        dir_path + QStringLiteral("/metadata.pegasus.txt"),
+        dir_path + QStringLiteral("/collections.pegasus.txt"),
+        dir_path + QStringLiteral("/metadata.txt"),
+        dir_path + QStringLiteral("/collections.txt"),
+    };
+
+    for (const QString& path : possible_paths) {
+        if (QFileInfo::exists(path))
+            return path;
+    }
+
+    return QString();
+}
+
+struct FileFilterGroup {
+    QStringList extensions;
+    QStringList files;
+    QString regex;
+};
+struct FileFilter {
+    QString collection_name;
+    QVector<QString> directories;
+    FileFilterGroup include;
+    FileFilterGroup exclude;
+
+    FileFilter(QString collection, QString base_dir)
+        : collection_name(std::move(collection))
+        , directories({std::move(base_dir)})
+    {}
+
+    MOVE_ONLY(FileFilter)
+};
+
+struct DataMaps {
+    HashMap<QString, modeldata::Game>& games;
+    HashMap<QString, modeldata::Collection>& collections;
+    HashMap<QString, std::vector<QString>>& collection_childs;
+};
+
+struct Helpers {
+    const HashMap<QString, CollAttrib> coll_attribs;
+    const HashMap<QString, GameAttrib> game_attribs;
+    const QRegularExpression rx_asset_key;
+    const QRegularExpression rx_count_range;
+    const QRegularExpression rx_percent;
+    const QRegularExpression rx_float;
+    const QRegularExpression rx_date;
+
+    Helpers()
+        : coll_attribs {
+            { QStringLiteral("shortname"), CollAttrib::SHORT_NAME },
+            { QStringLiteral("launch"), CollAttrib::LAUNCH_CMD },
+            { QStringLiteral("command"), CollAttrib::LAUNCH_CMD },
+            { QStringLiteral("workdir"), CollAttrib::LAUNCH_WORKDIR },
+            { QStringLiteral("working-directory"), CollAttrib::LAUNCH_WORKDIR },
+            { QStringLiteral("cwd"), CollAttrib::LAUNCH_WORKDIR },
+            { QStringLiteral("directory"), CollAttrib::DIRECTORIES },
+            { QStringLiteral("directories"), CollAttrib::DIRECTORIES },
+            { QStringLiteral("extension"), CollAttrib::EXTENSIONS },
+            { QStringLiteral("extensions"), CollAttrib::EXTENSIONS },
+            { QStringLiteral("file"), CollAttrib::FILES },
+            { QStringLiteral("files"), CollAttrib::FILES },
+            { QStringLiteral("regex"), CollAttrib::REGEX },
+            { QStringLiteral("ignore-extension"), CollAttrib::EXTENSIONS },
+            { QStringLiteral("ignore-extensions"), CollAttrib::EXTENSIONS },
+            { QStringLiteral("ignore-file"), CollAttrib::FILES },
+            { QStringLiteral("ignore-files"), CollAttrib::FILES },
+            { QStringLiteral("ignore-regex"), CollAttrib::REGEX },
+            { QStringLiteral("summary"), CollAttrib::SHORT_DESC },
+            { QStringLiteral("description"), CollAttrib::LONG_DESC },
+        }
+        , game_attribs {
+            { QStringLiteral("file"), GameAttrib::FILES },
+            { QStringLiteral("files"), GameAttrib::FILES },
+            { QStringLiteral("launch"), GameAttrib::LAUNCH_CMD },
+            { QStringLiteral("command"), GameAttrib::LAUNCH_CMD },
+            { QStringLiteral("workdir"), GameAttrib::LAUNCH_WORKDIR },
+            { QStringLiteral("working-directory"), GameAttrib::LAUNCH_WORKDIR },
+            { QStringLiteral("cwd"), GameAttrib::LAUNCH_WORKDIR },
+            { QStringLiteral("developer"), GameAttrib::DEVELOPERS },
+            { QStringLiteral("developers"), GameAttrib::DEVELOPERS },
+            { QStringLiteral("publisher"), GameAttrib::PUBLISHERS },
+            { QStringLiteral("publishers"), GameAttrib::PUBLISHERS },
+            { QStringLiteral("genre"), GameAttrib::GENRES },
+            { QStringLiteral("genres"), GameAttrib::GENRES },
+            { QStringLiteral("players"), GameAttrib::PLAYER_COUNT },
+            { QStringLiteral("summary"), GameAttrib::SHORT_DESC },
+            { QStringLiteral("description"), GameAttrib::LONG_DESC },
+            { QStringLiteral("release"), GameAttrib::RELEASE },
+            { QStringLiteral("rating"), GameAttrib::RATING },
+        }
+        , rx_asset_key(QStringLiteral(R"(^assets?\.(.+)$)"))
+        , rx_count_range(QStringLiteral("^(\\d+)(-(\\d+))?$"))
+        , rx_percent(QStringLiteral("^\\d+%$"))
+        , rx_float(QStringLiteral("^\\d(\\.\\d+)?$"))
+        , rx_date(QStringLiteral("^(\\d{4})(-(\\d{1,2}))?(-(\\d{1,2}))?$"))
+    {}
+};
+
+struct ParserContext {
+    const QString cur_dir;
+    const QString cur_metafile_path;
+
+    DataMaps& maps;
+    Helpers& helpers;
+
+    HashMap<QString, FileFilter> filters;
+    modeldata::Collection* cur_coll;
+    modeldata::Game* cur_game;
+    FileFilter* cur_filter;
+    bool parsing_game;
+
+    ParserContext(QString base_dir, QString metafile_path, DataMaps& maps, Helpers& helpers)
+        : cur_dir(std::move(base_dir))
+        , cur_metafile_path(std::move(metafile_path))
+        , maps(maps)
+        , helpers(helpers)
+        , cur_coll(nullptr)
+        , cur_filter(nullptr)
+        , parsing_game(false)
+    {}
+
+    void print_error(const int lineno, const QString msg){
+        qWarning().noquote() << MSG_PREFIX
+            << tr_log("`%1`, line %2: %3").arg(cur_metafile_path, QString::number(lineno), msg);
+    }
+};
+
+void parse_collection_entry(ParserContext& ctx, const config::Entry& entry)
+{
+    Q_ASSERT(ctx.cur_coll);
+    Q_ASSERT(ctx.cur_filter);
+    Q_ASSERT(!ctx.parsing_game);
+    Q_ASSERT(!ctx.cur_game);
+
+    if (!ctx.helpers.coll_attribs.count(entry.key)) {
+        ctx.print_error(entry.line, tr_log("unrecognized collection property `%3`, ignored").arg(entry.key));
+        return;
+    }
+
+    FileFilterGroup& filter_group = entry.key.startsWith(QLatin1String("ignore-"))
+        ? ctx.cur_filter->exclude
+        : ctx.cur_filter->include;
+
+    switch (ctx.helpers.coll_attribs.at(entry.key)) {
+        case CollAttrib::SHORT_NAME:
+            ctx.cur_coll->setShortName(entry_first_line(entry));
+            break;
+        case CollAttrib::LAUNCH_CMD:
+            ctx.cur_coll->launch_cmd = config::mergeLines(entry.values);
+            break;
+        case CollAttrib::DIRECTORIES:
+            for (const QString& value : entry.values) {
+                QFileInfo finfo(value);
+                if (finfo.isRelative())
+                    finfo.setFile(ctx.cur_dir % '/' % value);
+
+                ctx.cur_filter->directories.append(finfo.canonicalFilePath());
+            }
+            break;
+        case CollAttrib::EXTENSIONS:
+            filter_group.extensions.append(providers::pegasus::tokenize(entry_first_line(entry).toLower()));
+            break;
+        case CollAttrib::FILES:
+            for (const QString& value : entry.values)
+                filter_group.files.append(value);
+            break;
+        case CollAttrib::REGEX:
+            filter_group.regex = entry_first_line(entry);
+            break;
+        case CollAttrib::SHORT_DESC:
+            ctx.cur_coll->summary = config::mergeLines(entry.values);
+            break;
+        case CollAttrib::LONG_DESC:
+            ctx.cur_coll->description = config::mergeLines(entry.values);
+            break;
+        case CollAttrib::LAUNCH_WORKDIR:
+            ctx.cur_coll->launch_workdir = entry_first_line(entry);
+            break;
+    }
+}
+
+QVector<QString> tokenize_game_file_line(const QString& line)
+{
+    Q_ASSERT(line.trimmed() == line);
+
+    QVector<QString> parts;
+    QString current;
+
+    bool in_quote = false;
+    QChar quote_kar = '"';
+
+
+    for (int i = 0; i < line.length(); i++) {
+        const QChar kar = line.at(i);
+
+        // escape
+        if (kar == QLatin1Char('\\')) {
+            if (i + 1 < line.length())
+                current += line.at(++i);
+
+            continue;
+        }
+
+        const bool is_quote_char = (kar == QLatin1Char('\'') || kar == QLatin1Char('"'));
+        if (is_quote_char) {
+            // try to start or end the quote
+            if (!in_quote) {
+                in_quote = true;
+                quote_kar = kar;
+            }
+            else if (kar == quote_kar) {
+                in_quote = false;
+            }
+            // otherwise go on
+        }
+
+        if (kar.isSpace()) {
+            if (!in_quote) {
+                if (!current.isEmpty()) {
+                    parts.append(current);
+                    current.clear();
+                }
+            }
+        }
+
+        if (!in_quote && kar.isSpace()) {
+        }
+
+
+    }
+}
+
+void parse_game_entry_file_line(ParserContext& ctx, const QString& line)
+{
+    const auto parts = line.splitRef(QChar)
+    QFileInfo finfo(value);
+    if (finfo.isRelative())
+        finfo.setFile(ctx.cur_dir % '/' % value);
+
+}
+
+void parse_game_entry(ParserContext& ctx, const config::Entry& entry)
+{
+    Q_ASSERT(ctx.cur_coll);
+    Q_ASSERT(ctx.parsing_game);
+    Q_ASSERT(ctx.cur_game);
+
+    if (!ctx.helpers.game_attribs.count(entry.key)) {
+        ctx.print_error(entry.line, tr_log("unrecognized game property `%3`, ignored").arg(entry.key));
+        return;
+    }
+
+    switch (ctx.helpers.game_attribs.at(entry.key)) {
+        case GameAttrib::FILES:
+            for (const QString& value : entry.values) {
+
+                ctx.cur_game->files.append(value);
+            }
+            break;
+        case MetaAttribType::DEVELOPER:
+            curr_game->developers.append(config::mergeLines(entry.values));
+            break;
+        /*case MetaAttribType::PUBLISHER:
+            curr_game->publishers.append(val);
+            break;
+        case MetaAttribType::GENRE:
+            curr_game->genres.append(tokenize(val));
+            break;
+        case MetaAttribType::PLAYER_COUNT:
+            {
+                const auto rx_match = m_player_regex.match(val);
+                if (rx_match.hasMatch()) {
+                    const int a = rx_match.capturedRef(1).toInt();
+                    const int b = rx_match.capturedRef(3).toInt();
+                    curr_game->player_count = qMax(1, qMax(a, b));
+                }
+            }
+            break;
+        case MetaAttribType::SHORT_DESC:
+            curr_game->summary = val;
+            break;
+        case MetaAttribType::LONG_DESC:
+            curr_game->description = val;
+            break;
+        case MetaAttribType::RELEASE:
+            {
+                const auto rx_match = m_release_regex.match(val);
+                if (!rx_match.hasMatch()) {
+                    on_error(entry.line, tr_log("incorrect date format, should be YYYY(-MM(-DD))"));
+                    return;
+                }
+
+                const int y = qMax(1, rx_match.captured(1).toInt());
+                const int m = qBound(1, rx_match.captured(3).toInt(), 12);
+                const int d = qBound(1, rx_match.captured(5).toInt(), 31);
+                curr_game->release_date = QDate(y, m, d);
+            }
+            break;
+        case MetaAttribType::RATING:
+            {
+                const auto rx_match_a = m_rating_percent_regex.match(val);
+                if (rx_match_a.hasMatch()) {
+                    curr_game->rating = qBound(0.f, val.leftRef(val.length() - 1).toFloat() / 100.f, 1.f);
+                    return;
+                }
+                const auto rx_match_b = m_rating_float_regex.match(val);
+                if (rx_match_b.hasMatch()) {
+                    curr_game->rating = qBound(0.f, val.toFloat() / 100.f, 1.f);
+                    return;
+                }
+                on_error(lineno, tr_log("failed to parse rating value"));
+            }
+            break;
+        case MetaAttribType::LAUNCH_CMD:
+            curr_game->launch_cmd = val;
+            break;
+        case MetaAttribType::LAUNCH_WORKDIR:
+            curr_game->launch_workdir = val;
+            break;*/
+    }
+}
+
+// Returns true if the entry key matches asset regex.
+// The actual asset type check may still fail however.
+bool parse_asset_entry_maybe(ParserContext& ctx, const config::Entry& entry)
+{
+    Q_ASSERT(ctx.cur_coll);
+    Q_ASSERT(ctx.parsing_game && ctx.cur_game);
+
+    const auto rx_match = ctx.helpers.rx_asset_key.match(entry.key);
+    if (!rx_match.hasMatch())
+        return false;
+
+    const QString asset_key = rx_match.captured(1);
+    const AssetType asset_type = pegasus_assets::str_to_type(asset_key);
+    if (asset_type == AssetType::UNKNOWN) {
+        ctx.print_error(entry.line, tr_log("unknown asset type '%1', entry ignored").arg(asset_key));
+        return true;
+    }
+
+    modeldata::GameAssets& assets = ctx.parsing_game
+        ? ctx.cur_coll->default_assets
+        : ctx.cur_game->assets;
+    providers::pegasus::add_asset(assets, asset_type, entry.values.first(), ctx.cur_dir);
+    return true;
+}
+
+void parse_entry(ParserContext& ctx, const config::Entry& entry)
+{
+    // TODO: set cur_* by the return value of emplace
+    if (entry.key == QLatin1String("collection")) {
+        const QString& name = entry_first_line(entry);
+
+        if (!ctx.maps.collections.count(name))
+            ctx.maps.collections.emplace(name, modeldata::Collection(name));
+        if (!ctx.filters.count(name))
+            ctx.filters.emplace(name, ctx.cur_dir);
+
+        ctx.cur_game = nullptr;
+        ctx.cur_coll = &ctx.maps.collections.at(name);
+        ctx.cur_filter = &ctx.filters.at(name);
+        ctx.parsing_game = false;
+        return;
+    }
+
+    if (entry.key == QLatin1String("game")) {
+        const QString name = entry_first_line(entry);
+
+        if (!ctx.maps.games.count(name))
+            ctx.maps.games.emplace(name, modeldata::Game(name));
+
+        ctx.cur_game = &ctx.maps.games.at(name);
+        ctx.parsing_game = true;
+        return;
+    }
+
+
+    if (!ctx.cur_coll && !ctx.cur_game) {
+        ctx.print_error(entry.line, tr_log("no `collection` or `game` defined yet, entry ignored"));
+        return;
+    }
+
+    if (entry.key.startsWith(QLatin1String("x-")))
+        return;
+
+    if (parse_asset_entry_maybe(ctx, entry))
+        return;
+
+
+    if (ctx.parsing_game)
+        parse_game_entry(ctx, entry);
+    else
+        parse_collection_entry(ctx, entry);
+}
+
+MetafileData read_metafile(const QString& metafile_path,
+                           DataMaps& maps)
+{
+    MetafileData result;
+
+    const auto on_error = [&](const config::Error& error){
+        qWarning().noquote() << MSG_PREFIX
+            << tr_log("`%1`, line %2: %3").arg(metafile_path, QString::number(error.line), error.message);
+    };
+    const auto on_entry = [&](const config::Entry& entry){
+        parse_entry(maps, result, entry);
+    };
+
+    if (!config::readFile(metafile_path, on_entry, on_error)) {
+        qWarning().noquote() << MSG_PREFIX
+            << tr_log("Failed to read metadata file %1, file ignored").arg(metafile_path);
+    }
+    return result;
+}
+
 } // namespace
 
 
@@ -334,48 +617,6 @@ namespace providers {
 namespace pegasus {
 
 PegasusCollections::PegasusCollections()
-    : m_coll_attribs {
-        { QStringLiteral("shortname"), CollAttrib::SHORT_NAME },
-        { QStringLiteral("launch"), CollAttrib::LAUNCH_CMD },
-        { QStringLiteral("command"), CollAttrib::LAUNCH_CMD },
-        { QStringLiteral("workdir"), CollAttrib::LAUNCH_WORKDIR },
-        { QStringLiteral("working-directory"), CollAttrib::LAUNCH_WORKDIR },
-        { QStringLiteral("cwd"), CollAttrib::LAUNCH_WORKDIR },
-        { QStringLiteral("directory"), CollAttrib::DIRECTORIES },
-        { QStringLiteral("directories"), CollAttrib::DIRECTORIES },
-        { QStringLiteral("extension"), CollAttrib::EXTENSIONS },
-        { QStringLiteral("extensions"), CollAttrib::EXTENSIONS },
-        { QStringLiteral("file"), CollAttrib::FILES },
-        { QStringLiteral("files"), CollAttrib::FILES },
-        { QStringLiteral("regex"), CollAttrib::REGEX },
-        { QStringLiteral("ignore-extension"), CollAttrib::EXTENSIONS },
-        { QStringLiteral("ignore-extensions"), CollAttrib::EXTENSIONS },
-        { QStringLiteral("ignore-file"), CollAttrib::FILES },
-        { QStringLiteral("ignore-files"), CollAttrib::FILES },
-        { QStringLiteral("ignore-regex"), CollAttrib::REGEX },
-        { QStringLiteral("summary"), CollAttrib::SHORT_DESC },
-        { QStringLiteral("description"), CollAttrib::LONG_DESC },
-    }
-    , m_game_attribs {
-        { QStringLiteral("file"), GameAttrib::FILES },
-        { QStringLiteral("files"), GameAttrib::FILES },
-        { QStringLiteral("launch"), GameAttrib::LAUNCH_CMD },
-        { QStringLiteral("command"), GameAttrib::LAUNCH_CMD },
-        { QStringLiteral("workdir"), GameAttrib::LAUNCH_WORKDIR },
-        { QStringLiteral("working-directory"), GameAttrib::LAUNCH_WORKDIR },
-        { QStringLiteral("cwd"), GameAttrib::LAUNCH_WORKDIR },
-        { QStringLiteral("developer"), GameAttrib::DEVELOPERS },
-        { QStringLiteral("developers"), GameAttrib::DEVELOPERS },
-        { QStringLiteral("publisher"), GameAttrib::PUBLISHERS },
-        { QStringLiteral("publishers"), GameAttrib::PUBLISHERS },
-        { QStringLiteral("genre"), GameAttrib::GENRES },
-        { QStringLiteral("genres"), GameAttrib::GENRES },
-        { QStringLiteral("players"), GameAttrib::PLAYER_COUNT },
-        { QStringLiteral("summary"), GameAttrib::SHORT_DESC },
-        { QStringLiteral("description"), GameAttrib::LONG_DESC },
-        { QStringLiteral("release"), GameAttrib::RELEASE },
-        { QStringLiteral("rating"), GameAttrib::RATING },
-    }
 {
 }
 
@@ -385,9 +626,17 @@ void PegasusCollections::find_in_dirs(const std::vector<QString>& dir_list,
                                       HashMap<QString, std::vector<QString>>& collection_childs,
                                       const std::function<void(int)>& update_gamecount_maybe) const
 {
-    std::vector<GameFilter> all_filters;
+    DataMaps maps { games, collections, collection_childs };
+    //std::vector<GameFilter> all_filters;
 
     for (const QString& dir_path : dir_list) {
+        const QString metafile = find_metafile_in(dir_path);
+        if (metafile.isEmpty()) {
+            qWarning().noquote() << MSG_PREFIX
+                << tr_log("No metadata file found in %1, directory ignored").arg(dir_path);
+            continue;
+        }
+
         auto filters = read_collections_file(m_key_types, dir_path, collections);
         all_filters.reserve(all_filters.size() + filters.size());
         all_filters.insert(all_filters.end(),

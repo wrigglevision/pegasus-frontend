@@ -35,21 +35,28 @@ void Entry::reset()
     values.clear();
 }
 
-void readFile(const QString& path,
+/*void Error::set(int in_line, QString in_message)
+{
+    line = in_line;
+    message = in_message;
+}*/
+
+bool readFile(const QString& path,
               const std::function<void(const Entry&)>& onAttributeFound,
-              const std::function<void(const int, const QString)>& onError)
+              const std::function<void(const Error&)>& onError)
 {
     QFile file(path);
     if (!file.open(QFile::ReadOnly | QFile::Text))
-        return;
+        return false;
 
     QTextStream stream(&file);
-    return readStream(stream, onAttributeFound, onError);
+    readStream(stream, onAttributeFound, onError);
+    return true;
 }
 
 void readFile(QFile& file,
               const std::function<void(const Entry&)>& onAttributeFound,
-              const std::function<void(const int, const QString)>& onError)
+              const std::function<void(const Error&)>& onError)
 {
     Q_ASSERT(file.isOpen() && file.isReadable());
     QTextStream stream(&file);
@@ -58,18 +65,20 @@ void readFile(QFile& file,
 
 void readStream(QTextStream& stream,
                 const std::function<void(const Entry&)>& onAttributeFound,
-                const std::function<void(const int, const QString)>& onError)
+                const std::function<void(const Error&)>& onError)
 {
     constexpr auto EMPTY_LINE_MARK = QChar('.');
     const QRegularExpression rx_keyval(QStringLiteral(R"(^([^:]+):(.*)$)")); // key: value
 
+    Error error;
     Entry entry;
     entry.reset();
 
     const auto close_current_attrib = [&](){
         if (!entry.key.isEmpty()) {
-            if (entry.values.isEmpty())
-                onError(entry.line, tr_log("attribute value missing, entry ignored"));
+            if (entry.values.isEmpty()) {
+                onError({ entry.line, tr_log("attribute value missing, entry ignored") });
+            }
             else
                 onAttributeFound(entry);
         }
@@ -90,7 +99,7 @@ void readStream(QTextStream& stream,
         // multiline (starts with whitespace but trimmed_line is not empty)
         if (line.at(0).isSpace()) {
             if (entry.key.isEmpty()) {
-                onError(linenum, tr_log("line starts with whitespace, but no attribute has been defined yet"));
+                onError({ linenum, tr_log("line starts with whitespace, but no attribute has been defined yet") });
                 continue;
             }
 
@@ -126,7 +135,7 @@ void readStream(QTextStream& stream,
         }
 
         // invalid line
-        onError(linenum, tr_log("line invalid, skipped"));
+        onError({ linenum, tr_log("line invalid, skipped") });
     }
 
     // the very last line

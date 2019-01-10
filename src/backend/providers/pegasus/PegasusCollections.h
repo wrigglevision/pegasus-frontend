@@ -40,10 +40,6 @@ public:
                       HashMap<QString, modeldata::Collection>&,
                       HashMap<QString, std::vector<QString>>&,
                       const std::function<void(int)>&) const;
-
-private:
-    const HashMap<QString, CollAttrib> m_coll_attribs;
-    const HashMap<QString, GameAttrib> m_game_attribs;
 };
 
 } // namespace pegasus

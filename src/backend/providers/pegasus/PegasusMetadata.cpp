@@ -173,33 +173,7 @@ void PegasusMetadata::read_metadata_file(const QString& dir_path,
             curr_game = &it->second;
             return;
         }
-        if (!curr_game) {
-            on_error(entry.line, tr_log("no file defined yet, entry ignored"));
-            return;
-        }
 
-        if (entry.key.startsWith(QLatin1String("x-"))) {
-            // TODO: unimplemented
-            return;
-        }
-
-        const auto rx_asset = rx_asset_key.match(entry.key);
-        if (rx_asset.hasMatch()) {
-            const QString asset_key = rx_asset.captured(1);
-            const AssetType asset_type = pegasus_assets::str_to_type(asset_key);
-            if (asset_type == AssetType::UNKNOWN) {
-                on_error(entry.line, tr_log("unknown asset type '%1', entry ignored").arg(asset_key));
-                return;
-            }
-
-            add_asset(curr_game->assets, asset_type, config::mergeLines(entry.values), dir_path);
-            return;
-        }
-
-        if (!m_key_types.count(entry.key)) {
-            on_error(entry.line, tr_log("unrecognized attribute name `%3`, ignored").arg(entry.key));
-            return;
-        }
         switch (m_key_types.at(entry.key)) {
             case MetaAttribType::TITLE:
                 curr_game->title = config::mergeLines(entry.values);
