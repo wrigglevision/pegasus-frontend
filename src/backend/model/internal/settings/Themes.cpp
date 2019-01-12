@@ -50,9 +50,9 @@ HashMap<QString, QString> read_metafile(const QString& config_file_path)
         [&](const config::Entry& entry){
             result.emplace(entry.key, config::mergeLines(entry.values)); // TODO !!!!!!
         },
-        [&](const int linenum, const QString msg){
+        [&](const config::Error& error){
             qWarning().noquote() << tr_log("`%1`, line %2: %3")
-                .arg(config_file_path, QString::number(linenum), msg);
+                .arg(config_file_path, QString::number(error.line), error.message);
         });
     return result;
 }

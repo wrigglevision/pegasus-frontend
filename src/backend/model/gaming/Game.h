@@ -18,9 +18,11 @@
 #pragma once
 
 #include "GameAssets.h"
+#include "GameFile.h"
 #include "modeldata/gaming/CollectionData.h"
 #include "modeldata/gaming/GameData.h"
 
+#include "QtQmlTricks/QQmlObjectListModel.h"
 #include <QObject>
 
 
@@ -70,6 +72,7 @@ class Game : public QObject {
     Q_PROPERTY(QDateTime lastPlayed READ lastPlayed NOTIFY playStatsChanged)
 
     Q_PROPERTY(model::GameAssets* assets READ assetsPtr CONSTANT)
+    QML_OBJMODEL_PROPERTY(model::GameFile, files)
 
 public:
     explicit Game(modeldata::Game, QObject* parent = nullptr);

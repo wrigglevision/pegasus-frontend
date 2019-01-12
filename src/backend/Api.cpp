@@ -61,6 +61,11 @@ void ApiObject::onStaticDataLoaded()
                 this, &ApiObject::onGameLaunchRequested);
         connect(game, &model::Game::favoriteChanged,
                 this, &ApiObject::onGameFavoriteChanged);
+
+        for (model::GameFile* gamefile : *game->files()) {
+            connect(gamefile, &model::GameFile::launchRequested,
+                    this, &ApiObject::onGameFileLaunchRequested);
+        }
     }
 
     m_internal.meta().onUiReady();
@@ -73,7 +78,29 @@ void ApiObject::onGameLaunchRequested()
         return;
 
     m_launch_game = static_cast<model::Game*>(QObject::sender());
-    emit launchGame(m_launch_game);
+    m_launch_game_file.clear();
+
+    if (m_launch_game->files()->size() > 1) {
+        emit launchSelectFile(m_launch_game);
+        return;
+    }
+
+    if (m_launch_game->files()->size() == 1)
+        m_launch_game_file = m_launch_game->files()->first()->path();
+
+    // if m_launch_game_file is empty, the game's launch command will be used
+    emit launchGame(m_launch_game, m_launch_game_file);
+}
+
+void ApiObject::onGameFileLaunchRequested()
+{
+    if (m_launch_game)
+        return;
+
+    const auto gamefile = static_cast<model::GameFile*>(QObject::sender());
+    m_launch_game = static_cast<model::Game*>(gamefile->parent());
+    m_launch_game_file = gamefile->path();
+    emit launchGame(m_launch_game, m_launch_game_file);
 }
 
 void ApiObject::onGameLaunchOk()

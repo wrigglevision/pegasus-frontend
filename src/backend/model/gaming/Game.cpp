@@ -22,9 +22,16 @@ namespace model {
 
 Game::Game(modeldata::Game game, QObject* parent)
     : QObject(parent)
+    , m_files(this)
     , m_game(std::move(game))
     , m_assets(&m_game.assets, this)
 {
+    Q_ASSERT(!m_game.launch_cmd.isEmpty() || !m_game.files.empty());
+
+    for (auto& entry : m_game.files)
+        m_files.append(new model::GameFile(entry.first, std::move(entry.second), this));
+
+    m_game.files.clear();
 }
 
 void Game::setFavorite(bool new_val)

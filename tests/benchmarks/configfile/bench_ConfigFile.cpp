@@ -52,7 +52,7 @@ void bench_ConfigFile::readStream(QTextStream& stream)
 {
     config::readStream(stream,
         [this](const config::Entry& entry){ this->onAttributeFound(entry); },
-        [this](const int linenum, const QString msg){ this->onError(linenum, msg); });
+        [this](const config::Error& error){ this->onError(error.line, error.message); });
 }
 
 
@@ -75,7 +75,7 @@ void bench_ConfigFile::file()
 
         config::readFile(":/test.cfg",
             [this](const config::Entry& entry){ this->onAttributeFound(entry); },
-            [this](const int linenum, const QString msg){ this->onError(linenum, msg); });
+            [this](const config::Error& error){ this->onError(error.line, error.message); });
     }
 }
 

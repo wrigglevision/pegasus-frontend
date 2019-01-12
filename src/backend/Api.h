@@ -52,7 +52,9 @@ public:
     void startScanning();
 
 signals:
-    void launchGame(const model::Game*);
+    void launchGame(const model::Game*, const QString);
+    void launchFailed(const QString);
+    void launchSelectFile(const model::Game*);
     void memoryChanged();
 
     // triggers translation update
@@ -69,11 +71,13 @@ private slots:
     void onStaticDataLoaded();
     void onGameFavoriteChanged();
     void onGameLaunchRequested();
+    void onGameFileLaunchRequested();
     void onThemeChanged();
 
 private:
     // game launching
     model::Game* m_launch_game;
+    QString m_launch_game_file;
 
     // initialization
     ProviderManager m_providerman;
