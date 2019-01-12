@@ -18,7 +18,29 @@
 #include "GameData.h"
 
 
+namespace {
+QString pretty_filename(const QFileInfo& fi)
+{
+    return fi.completeBaseName()
+        .replace(QLatin1Char('_'), QLatin1Char(' '))
+        .replace(QLatin1Char('.'), QLatin1Char(' '));
+}
+} // namespace
+
+
 namespace modeldata {
+
+GameFile::GameFile() = default;
+GameFile::GameFile(const QFileInfo& fi)
+    : name(pretty_filename(fi))
+{}
+
+Game::Game(const QFileInfo& fi)
+    : Game(pretty_filename(fi))
+{
+    // TODO: one call to the prettifier could be optimized out here
+    files.emplace(fi.absoluteFilePath(), GameFile(fi));
+}
 
 Game::Game(QString title)
     : title(title)
@@ -27,7 +49,6 @@ Game::Game(QString title)
     , rating(0.f)
     , playcount(0)
     , playtime(0)
-{
-}
+{}
 
 } // namespace modeldata

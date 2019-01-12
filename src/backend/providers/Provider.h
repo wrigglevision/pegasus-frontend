@@ -17,17 +17,23 @@
 
 #pragma once
 
+#include "modeldata/gaming/GameData.h"
+#include "modeldata/gaming/CollectionData.h"
 #include "utils/FwdDeclModel.h"
-#include "utils/FwdDeclModelData.h"
 #include "utils/HashMap.h"
 
 #include <QString>
 #include <QObject>
-#include <QVector>
 #include <vector>
 
 
 namespace providers {
+
+struct SearchContext {
+    std::vector<modeldata::Game> games;
+    HashMap<QString, modeldata::Collection> collections;
+    HashMap<QString, std::vector<size_t>> collection_childs;
+};
 
 class Provider : public QObject {
     Q_OBJECT
@@ -38,24 +44,17 @@ public:
 
     /// Initialization first stage:
     /// Find all games and collections.
-    virtual void findLists(HashMap<QString, modeldata::Game>&,
-                           HashMap<QString, modeldata::Collection>&,
-                           HashMap<QString, std::vector<QString>>&)
-    {}
+    virtual void findLists(SearchContext&) {}
 
     /// Initialization second stage:
     /// Enhance the previously found games and collections with metadata and assets.
-    virtual void findStaticData(HashMap<QString, modeldata::Game>&,
-                                const HashMap<QString, modeldata::Collection>&,
-                                const HashMap<QString, std::vector<QString>>&)
-    {}
+    virtual void findStaticData(SearchContext&) {}
 
     /// Initialization third stage:
     /// Find data that may change during the runtime for all games
     virtual void findDynamicData(const QVector<model::Game*>&,
                                  const QVector<model::Collection*>&,
-                                 const HashMap<QString, model::Game*>&)
-    {}
+                                 const HashMap<size_t, model::Game*>&) {}
 
 
     // events

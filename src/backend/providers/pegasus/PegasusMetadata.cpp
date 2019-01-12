@@ -43,16 +43,18 @@ AssetType detect_asset_type(const QString& basename, const QString& ext)
     return AssetType::UNKNOWN;
 }
 
-void find_assets(const std::vector<QString>& dir_list, HashMap<QString, modeldata::Game>& games)
+void find_assets(const std::vector<QString>& dir_list, std::vector<modeldata::Game>& games)
 {
     // shortpath: canonical path to dir + extensionless filename
-    HashMap<QString, modeldata::Game*> games_by_shortpath;
+    HashMap<QString, modeldata::Game* const> games_by_shortpath;
     games_by_shortpath.reserve(games.size());
-    for (auto& pair : games) {
-        QString shortpath = pair.second.fileinfo().canonicalPath()
-                          % '/'
-                          % pair.second.fileinfo().completeBaseName();
-        games_by_shortpath.emplace(std::move(shortpath), &pair.second);
+    for (modeldata::Game& game : games) {
+        for (auto& gf_entry : game.files) {
+            const QFileInfo fi(gf_entry.first);
+
+            QString shortpath = fi.canonicalPath() % '/' % fi.completeBaseName();
+            games_by_shortpath.emplace(std::move(shortpath), &game);
+        }
     }
 
 
@@ -87,178 +89,13 @@ void find_assets(const std::vector<QString>& dir_list, HashMap<QString, modeldat
 namespace providers {
 namespace pegasus {
 
-enum class MetaAttribType : unsigned char {
-    TITLE,
-    DEVELOPER,
-    PUBLISHER,
-    GENRE,
-    PLAYER_COUNT,
-    SHORT_DESC,
-    LONG_DESC,
-    RELEASE,
-    RATING,
-    LAUNCH_CMD,
-    LAUNCH_WORKDIR,
-};
-
 PegasusMetadata::PegasusMetadata()
-    : m_key_types {
-        { QStringLiteral("title"), MetaAttribType::TITLE },
-        { QStringLiteral("name"), MetaAttribType::TITLE },
-        { QStringLiteral("developer"), MetaAttribType::DEVELOPER },
-        { QStringLiteral("developers"), MetaAttribType::DEVELOPER },
-        { QStringLiteral("publisher"), MetaAttribType::PUBLISHER },
-        { QStringLiteral("publishers"), MetaAttribType::PUBLISHER },
-        { QStringLiteral("genre"), MetaAttribType::GENRE },
-        { QStringLiteral("genres"), MetaAttribType::GENRE },
-        { QStringLiteral("players"), MetaAttribType::PLAYER_COUNT },
-        { QStringLiteral("summary"), MetaAttribType::SHORT_DESC },
-        { QStringLiteral("description"), MetaAttribType::LONG_DESC },
-        { QStringLiteral("release"), MetaAttribType::RELEASE },
-        { QStringLiteral("rating"), MetaAttribType::RATING },
-        { QStringLiteral("launch"), MetaAttribType::LAUNCH_CMD },
-        { QStringLiteral("command"), MetaAttribType::LAUNCH_CMD },
-        { QStringLiteral("workdir"), MetaAttribType::LAUNCH_WORKDIR },
-        { QStringLiteral("working-directory"), MetaAttribType::LAUNCH_WORKDIR },
-        { QStringLiteral("cwd"), MetaAttribType::LAUNCH_WORKDIR },
-    }
-    , m_player_regex(QStringLiteral("^(\\d+)(-(\\d+))?$"))
-    , m_rating_percent_regex(QStringLiteral("^\\d+%$"))
-    , m_rating_float_regex(QStringLiteral("^\\d(\\.\\d+)?$"))
-    , m_release_regex(QStringLiteral("^(\\d{4})(-(\\d{1,2}))?(-(\\d{1,2}))?$"))
-{
-}
+{}
 
 void PegasusMetadata::enhance_in_dirs(const std::vector<QString>& dir_list,
-                                      HashMap<QString, modeldata::Game>& games,
-                                      const HashMap<QString, modeldata::Collection>&,
-                                      const HashMap<QString, std::vector<QString>>&) const
+                                      std::vector<modeldata::Game>& games) const
 {
     find_assets(dir_list, games);
-
-    for (const QString& dir_path : dir_list)
-        read_metadata_file(dir_path, games);
-}
-
-
-void PegasusMetadata::read_metadata_file(const QString& dir_path,
-                                         HashMap<QString, modeldata::Game>& games) const
-{
-    static constexpr auto MSG_PREFIX = "Collections:";
-    const QRegularExpression rx_asset_key(QStringLiteral(R"(^assets?\.(.+)$)"));
-
-    QString curr_config_path;
-    modeldata::Game* curr_game = nullptr;
-
-    const auto on_error = [&](const int lineno, const QString msg){
-        qWarning().noquote() << MSG_PREFIX
-            << tr_log("`%1`, line %2: %3").arg(curr_config_path, QString::number(lineno), msg);
-    };
-    const auto on_attribute = [&](const config::Entry& entry){
-        if (entry.key == QLatin1String("file")) {
-            const QString val = config::mergeLines(entry.values);
-            QFileInfo finfo(val);
-            if (finfo.isRelative())
-                finfo.setFile(dir_path % '/' % val);
-
-            curr_game = nullptr;
-
-            const auto it = games.find(finfo.canonicalFilePath());
-            if (it == games.cend()) {
-                on_error(entry.line,
-                    tr_log("the game `%1` is either missing or excluded, values for it will be ignored").arg(val));
-                return;
-            }
-
-            curr_game = &it->second;
-            return;
-        }
-
-        switch (m_key_types.at(entry.key)) {
-            case MetaAttribType::TITLE:
-                curr_game->title = config::mergeLines(entry.values);
-                break;
-            case MetaAttribType::DEVELOPER:
-                curr_game->developers.append(config::mergeLines(entry.values));
-                break;
-            /*case MetaAttribType::PUBLISHER:
-                curr_game->publishers.append(val);
-                break;
-            case MetaAttribType::GENRE:
-                curr_game->genres.append(tokenize(val));
-                break;
-            case MetaAttribType::PLAYER_COUNT:
-                {
-                    const auto rx_match = m_player_regex.match(val);
-                    if (rx_match.hasMatch()) {
-                        const int a = rx_match.capturedRef(1).toInt();
-                        const int b = rx_match.capturedRef(3).toInt();
-                        curr_game->player_count = qMax(1, qMax(a, b));
-                    }
-                }
-                break;
-            case MetaAttribType::SHORT_DESC:
-                curr_game->summary = val;
-                break;
-            case MetaAttribType::LONG_DESC:
-                curr_game->description = val;
-                break;
-            case MetaAttribType::RELEASE:
-                {
-                    const auto rx_match = m_release_regex.match(val);
-                    if (!rx_match.hasMatch()) {
-                        on_error(entry.line, tr_log("incorrect date format, should be YYYY(-MM(-DD))"));
-                        return;
-                    }
-
-                    const int y = qMax(1, rx_match.captured(1).toInt());
-                    const int m = qBound(1, rx_match.captured(3).toInt(), 12);
-                    const int d = qBound(1, rx_match.captured(5).toInt(), 31);
-                    curr_game->release_date = QDate(y, m, d);
-                }
-                break;
-            case MetaAttribType::RATING:
-                {
-                    const auto rx_match_a = m_rating_percent_regex.match(val);
-                    if (rx_match_a.hasMatch()) {
-                        curr_game->rating = qBound(0.f, val.leftRef(val.length() - 1).toFloat() / 100.f, 1.f);
-                        return;
-                    }
-                    const auto rx_match_b = m_rating_float_regex.match(val);
-                    if (rx_match_b.hasMatch()) {
-                        curr_game->rating = qBound(0.f, val.toFloat() / 100.f, 1.f);
-                        return;
-                    }
-                    on_error(lineno, tr_log("failed to parse rating value"));
-                }
-                break;
-            case MetaAttribType::LAUNCH_CMD:
-                curr_game->launch_cmd = val;
-                break;
-            case MetaAttribType::LAUNCH_WORKDIR:
-                curr_game->launch_workdir = val;
-                break;*/
-        }
-    };
-
-
-    // the actual reading
-
-    const QStringList possible_paths {
-        dir_path + QStringLiteral("/metadata.pegasus.txt"),
-        dir_path + QStringLiteral("/metadata.txt"),
-    };
-    for (const QString& path : possible_paths) {
-        if (!::validFile(path))
-            continue;
-
-        qInfo().noquote() << MSG_PREFIX << tr_log("found `%1`").arg(path);
-
-        curr_game = nullptr;
-        curr_config_path = path;
-        config::readFile(path,  on_attribute, on_error);
-        break; // if the first file exists, don't check the other
-    }
 }
 
 } // namespace pegasus

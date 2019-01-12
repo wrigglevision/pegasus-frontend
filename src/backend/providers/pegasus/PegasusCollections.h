@@ -28,17 +28,13 @@
 namespace providers {
 namespace pegasus {
 
-enum class CollAttrib : unsigned char;
-enum class GameAttrib : unsigned char;
-
 class PegasusCollections {
 public:
-    PegasusCollections();
-
+    PegasusCollections() = default;
     void find_in_dirs(const std::vector<QString>&,
-                      HashMap<QString, modeldata::Game>&,
+                      std::vector<modeldata::Game>&,
                       HashMap<QString, modeldata::Collection>&,
-                      HashMap<QString, std::vector<QString>>&,
+                      HashMap<QString, std::vector<size_t>>&,
                       const std::function<void(int)>&) const;
 };
 

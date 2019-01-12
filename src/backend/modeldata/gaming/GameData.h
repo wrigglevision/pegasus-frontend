@@ -32,12 +32,19 @@ namespace modeldata {
 
 struct GameFile {
     QString name;
-    QFileInfo fileinfo;
+    // TODO: in the future...
+    // QString summary;
+    // QString description;
+    // QString launch_cmd;
+    // QString launch_workdir;
 
+    GameFile();
+    explicit GameFile(const QFileInfo&);
     MOVE_ONLY(GameFile)
 };
 
 struct Game {
+    explicit Game(const QFileInfo&);
     explicit Game(QString title);
     MOVE_ONLY(Game)
 
@@ -47,7 +54,7 @@ struct Game {
 
     QString launch_cmd;
     QString launch_workdir;
-    QVector<GameFile> files;
+    HashMap<QString, GameFile> files;
 
     int player_count;
     bool is_favorite;

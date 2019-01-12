@@ -48,14 +48,13 @@ void sort_collections(QVector<model::Collection*>& collections)
     );
 }
 
-void remove_empty_collections(HashMap<QString, modeldata::Collection>& collections,
-                              HashMap<QString, std::vector<QString>>& collection_childs)
+void remove_empty_collections(providers::SearchContext& ctx)
 {
     std::vector<QString> empty_colls;
 
-    for (const auto& coll_entry : collections) {
-        const auto it = collection_childs.find(coll_entry.first);
-        if (it != collection_childs.cend() && collection_childs.at(it->first).size() > 0)
+    for (const auto& coll_entry : ctx.collections) {
+        const auto it = ctx.collection_childs.find(coll_entry.first);
+        if (it != ctx.collection_childs.cend() && ctx.collection_childs.at(it->first).size() > 0)
             continue;
 
         empty_colls.push_back(coll_entry.first);
@@ -63,51 +62,48 @@ void remove_empty_collections(HashMap<QString, modeldata::Collection>& collectio
 
     for (const QString& coll : empty_colls) {
         qWarning().noquote() << tr_log("No games found for collection '%1', ignored").arg(coll);
-        collections.erase(coll);
-        collection_childs.erase(coll);
+        ctx.collections.erase(coll);
+        ctx.collection_childs.erase(coll);
     }
 }
 
-void run_list_providers(const std::vector<ProviderPtr>& providers,
-                        HashMap<QString, modeldata::Game>& games,
-                        HashMap<QString, modeldata::Collection>& collections,
-                        HashMap<QString, std::vector<QString>>& collection_childs)
+void run_list_providers(providers::SearchContext& ctx, const std::vector<ProviderPtr>& providers)
 {
-    // run the providers in reverse, so higher priority providers can overwrite
-    // the previous data. The Pegasus provider will run last, when the other
-    // providers have already collected the extra dirs to check.
-    for (auto it = providers.crbegin(); it != providers.crend(); ++it)
-        (*it)->findLists(games, collections, collection_childs);
+    for (const ProviderPtr& ptr : providers)
+        ptr->findLists(ctx);
 
-    remove_empty_collections(collections, collection_childs);
+    remove_empty_collections(ctx);
 }
 
-void build_ui_layer(QThread* const ui_thread,
-                    HashMap<QString, modeldata::Game>& games,
-                    HashMap<QString, modeldata::Collection>& collections,
-                    HashMap<QString, std::vector<QString>>& collection_childs,
+void run_asset_providers(providers::SearchContext& ctx, const std::vector<ProviderPtr>& providers)
+{
+    for (const auto& provider : providers)
+        provider->findStaticData(ctx);
+}
+
+void build_ui_layer(providers::SearchContext& ctx,
+                    QThread* const ui_thread,
                     QQmlObjectListModel<model::Game>& game_model,
                     QQmlObjectListModel<model::Collection>& collection_model,
-                    HashMap<QString, model::Game*>& gameid_to_q_game)
+                    HashMap<size_t, model::Game*>& gameid_to_q_game)
 {
     QVector<model::Game*> q_games;
-    q_games.reserve(static_cast<int>(games.size()));
-    gameid_to_q_game.reserve(games.size());
+    q_games.reserve(static_cast<int>(ctx.games.size()));
 
-    for (auto& keyval : games) {
-        auto qobj = new model::Game(std::move(keyval.second));
+    for (size_t i = 0; i < ctx.games.size(); i++) {
+        auto qobj = new model::Game(std::move(ctx.games[i]));
         qobj->moveToThread(ui_thread);
         q_games.append(qobj);
-        gameid_to_q_game.emplace(keyval.first, q_games.last());
+        gameid_to_q_game.emplace(i, q_games.last());
     }
     sort_games(q_games);
     game_model.append(q_games);
 
 
     QVector<model::Collection*> q_collections;
-    q_collections.reserve(static_cast<int>(collections.size()));
+    q_collections.reserve(static_cast<int>(ctx.collections.size()));
 
-    for (auto& keyval : collections) {
+    for (auto& keyval : ctx.collections) {
         auto qobj = new model::Collection(std::move(keyval.second));
         qobj->moveToThread(ui_thread);
         q_collections.append(qobj);
@@ -119,8 +115,8 @@ void build_ui_layer(QThread* const ui_thread,
     for (model::Collection* const q_coll : q_collections) {
         QVector<model::Game*> q_childs;
 
-        const std::vector<QString>& game_keys = collection_childs[q_coll->name()];
-        for (const QString& game_key : game_keys)
+        const std::vector<size_t>& game_keys = ctx.collection_childs[q_coll->name()];
+        for (size_t game_key : game_keys)
             q_childs.append(gameid_to_q_game.at(game_key));
 
         sort_games(q_childs);
@@ -134,8 +130,8 @@ ProviderManager::ProviderManager(QObject* parent)
     : QObject(parent)
 {
     m_providers.emplace_back(new providers::pegasus::PegasusProvider());
-    m_providers.emplace_back(new providers::favorites::Favorites());
-    m_providers.emplace_back(new providers::playtime::PlaytimeStats());
+    //m_providers.emplace_back(new providers::favorites::Favorites());
+    //m_providers.emplace_back(new providers::playtime::PlaytimeStats());
 #ifdef WITH_COMPAT_STEAM
     if (AppSettings::ext_providers.at(ExtProvider::STEAM).enabled)
         m_providers.emplace_back(new providers::steam::SteamProvider());
@@ -169,26 +165,22 @@ void ProviderManager::startSearch(QQmlObjectListModel<model::Game>& game_model,
     Q_ASSERT(!m_init_seq.isRunning());
 
     m_init_seq = QtConcurrent::run([this, &game_model, &collection_model]{
-        HashMap<QString, modeldata::Game> games;
-        HashMap<QString, modeldata::Collection> collections;
-        HashMap<QString, std::vector<QString>> collection_childs;
+        providers::SearchContext ctx;
 
         QElapsedTimer timer;
         timer.start();
 
 
-        run_list_providers(m_providers, games, collections, collection_childs);
+        run_list_providers(ctx, m_providers);
         emit firstPhaseComplete(timer.restart());
 
-        for (const auto& provider : m_providers)
-            provider->findStaticData(games, collections, collection_childs);
+        run_asset_providers(ctx, m_providers);
         emit secondPhaseComplete(timer.restart());
 
 
-        HashMap<QString, model::Game*> gameid_to_q_game;
+        HashMap<size_t, model::Game*> gameid_to_q_game;
 
-        build_ui_layer(parent()->thread(),
-                       games, collections, collection_childs,
+        build_ui_layer(ctx, parent()->thread(),
                        game_model, collection_model, gameid_to_q_game);
         emit staticDataReady();
 

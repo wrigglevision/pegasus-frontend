@@ -28,13 +28,13 @@
 
 
 namespace {
-void format_launch_command(QString& launch_cmd, const modeldata::Game& game)
+void format_launch_command(QString& launch_cmd, const QFileInfo& finfo)
 {
     launch_cmd
-        .replace(QLatin1String("{file.path}"), QDir::toNativeSeparators(game.fileinfo().absoluteFilePath()))
-        .replace(QLatin1String("{file.name}"), game.fileinfo().fileName())
-        .replace(QLatin1String("{file.basename}"), game.fileinfo().completeBaseName())
-        .replace(QLatin1String("{file.dir}"), QDir::toNativeSeparators(game.fileinfo().absolutePath()));
+        .replace(QLatin1String("{file.path}"), QDir::toNativeSeparators(finfo.absoluteFilePath()))
+        .replace(QLatin1String("{file.name}"), finfo.fileName())
+        .replace(QLatin1String("{file.basename}"), finfo.completeBaseName())
+        .replace(QLatin1String("{file.dir}"), QDir::toNativeSeparators(finfo.absolutePath()));
 }
 } // namespace
 
@@ -49,13 +49,21 @@ ProcessLauncher::ProcessLauncher(QObject* parent)
     , m_process(nullptr)
 {}
 
-void ProcessLauncher::onLaunchRequested(const model::Game* game)
+void ProcessLauncher::onLaunchRequested(const model::Game* game, const QString file_abs_path)
 {
     Q_ASSERT(game);
+    Q_ASSERT(file_abs_path.isEmpty() || game->data().files.count(file_abs_path));
+
+    const QFileInfo finfo(file_abs_path);
+
+    // TODO: in the future
+    /*if (!file_abs_path.isEmpty()) {
+        launch_cmd = game->data().files.at(file_abs_path).launch_cmd;
+    }*/
 
     QString launch_cmd = game->data().launch_cmd;
     if (!launch_cmd.isEmpty())
-        format_launch_command(launch_cmd, game->data());
+        format_launch_command(launch_cmd, finfo);
 
     if (launch_cmd.isEmpty()) {
         qInfo().noquote()
@@ -68,7 +76,7 @@ void ProcessLauncher::onLaunchRequested(const model::Game* game)
 
     QString workdir = game->data().launch_workdir;
     if (workdir.isEmpty())
-        workdir = game->data().fileinfo().absolutePath();
+        workdir = finfo.absolutePath();
 
 
     beforeRun();

@@ -34,12 +34,8 @@ public:
     explicit PegasusProvider(QObject* parent = nullptr);
     explicit PegasusProvider(std::vector<QString> game_dirs, QObject* parent = nullptr);
 
-    void findLists(HashMap<QString, modeldata::Game>&,
-                   HashMap<QString, modeldata::Collection>&,
-                   HashMap<QString, std::vector<QString>>&) final;
-    void findStaticData(HashMap<QString, modeldata::Game>&,
-                        const HashMap<QString, modeldata::Collection>&,
-                        const HashMap<QString, std::vector<QString>>&) final;
+    void findLists(SearchContext&) final;
+    void findStaticData(SearchContext&) final;
 
 private:
     const std::vector<QString> m_game_dirs;

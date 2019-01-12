@@ -67,19 +67,15 @@ PegasusProvider::PegasusProvider(std::vector<QString> game_dirs, QObject* parent
     , m_game_dirs(std::move(game_dirs))
 {}
 
-void PegasusProvider::findLists(HashMap<QString, modeldata::Game>& games,
-                                HashMap<QString, modeldata::Collection>& collections,
-                                HashMap<QString, std::vector<QString>>& collection_childs)
+void PegasusProvider::findLists(SearchContext& ctx)
 {
-    collection_finder.find_in_dirs(m_game_dirs, games, collections, collection_childs,
+    collection_finder.find_in_dirs(m_game_dirs, ctx.games, ctx.collections, ctx.collection_childs,
                                    [this](int game_count){ emit gameCountChanged(game_count); });
 }
 
-void PegasusProvider::findStaticData(HashMap<QString, modeldata::Game>& games,
-                                     const HashMap<QString, modeldata::Collection>& collections,
-                                     const HashMap<QString, std::vector<QString>>& collection_childs)
+void PegasusProvider::findStaticData(SearchContext& ctx)
 {
-    metadata_finder.enhance_in_dirs(m_game_dirs, games, collections, collection_childs);
+    metadata_finder.enhance_in_dirs(m_game_dirs, ctx.games);
 }
 
 } // namespace pegasus

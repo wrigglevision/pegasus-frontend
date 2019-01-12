@@ -41,6 +41,7 @@ struct GameAssets {
     void appendMulti(AssetType, QString);
 
 private:
+    // TODO: merge these two
     HashMap<AssetType, QString, EnumHash> m_single_assets;
     HashMap<AssetType, QStringList, EnumHash> m_multi_assets;
 };

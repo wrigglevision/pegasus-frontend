@@ -21,32 +21,18 @@
 #include "utils/HashMap.h"
 
 #include <QString>
-#include <QRegularExpression>
 #include <vector>
 
 
 namespace providers {
 namespace pegasus {
 
-enum class MetaAttribType : unsigned char;
-
 class PegasusMetadata {
 public:
     PegasusMetadata();
 
     void enhance_in_dirs(const std::vector<QString>&,
-                         HashMap<QString, modeldata::Game>&,
-                         const HashMap<QString, modeldata::Collection>&,
-                         const HashMap<QString, std::vector<QString>>&) const;
-
-private:
-    const HashMap<QString, MetaAttribType> m_key_types;
-    const QRegularExpression m_player_regex;
-    const QRegularExpression m_rating_percent_regex;
-    const QRegularExpression m_rating_float_regex;
-    const QRegularExpression m_release_regex;
-
-    void read_metadata_file(const QString&, HashMap<QString, modeldata::Game>&) const;
+                         std::vector<modeldata::Game>&) const;
 };
 
 } // namespace pegasus
