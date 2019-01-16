@@ -19,7 +19,9 @@ FileFilterGroup::FileFilterGroup() = default;
 FileFilter::FileFilter(QString collection, QString base_dir)
     : collection_name(std::move(collection))
     , directories({std::move(base_dir)})
-{}
+{
+    Q_ASSERT(!directories.front().isEmpty());
+}
 
 
 Helpers::Helpers()
@@ -81,15 +83,18 @@ Helpers::Helpers()
 {}
 
 
-ParserContext::ParserContext(QString metafile_path, OutputVars& outvars, const Helpers& helpers)
-    : metafile_path(std::move(metafile_path))
+ParserContext::ParserContext(QString file_path, OutputVars& outvars, const Helpers& helpers)
+    : metafile_path(std::move(file_path))
     , dir_path(QFileInfo(metafile_path).path())
     , outvars(outvars)
     , helpers(helpers)
     , cur_coll(nullptr)
     , cur_filter(nullptr)
     , cur_game(nullptr)
-{}
+{
+    Q_ASSERT(!metafile_path.isEmpty());
+    Q_ASSERT(!dir_path.isEmpty());
+}
 
 void ParserContext::print_error(const int lineno, const QString msg) const {
     qWarning().noquote() << MSG_PREFIX
