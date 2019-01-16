@@ -17,6 +17,7 @@
         <file>with_meta/basic.ext</file>
         <file>with_meta/multi.a.ext</file>
         <file>with_meta/multi.b.ext</file>
+        <file>with_meta/pre.ext</file>
         <file>with_meta/media/game_ignored.ext</file>
         <file>with_meta/subdir/game_in_subdir.ext</file>
         <file>with_meta/metadata.pegasus.txt</file>
