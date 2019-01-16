@@ -37,7 +37,7 @@ private:
     std::vector<config::Entry> m_entries;
 
     void onAttributeFound(const config::Entry&);
-    void onError(int, const QString&);
+    void onError(const config::Error&);
 
     void readStream(QTextStream&);
 };
@@ -48,17 +48,17 @@ void test_ConfigFile::onAttributeFound(const config::Entry& entry)
     m_entries.emplace_back(entry);
 }
 
-void test_ConfigFile::onError(int linenum, const QString& msg)
+void test_ConfigFile::onError(const config::Error& error)
 {
     qWarning().noquote() << QObject::tr("line %1: %2")
-        .arg(QString::number(linenum), msg);
+        .arg(QString::number(error.line), error.message);
 }
 
 void test_ConfigFile::readStream(QTextStream& stream)
 {
     config::readStream(stream,
         [this](const config::Entry& entry){ this->onAttributeFound(entry); },
-        [this](const int lineno, const QString& msg){ this->onError(lineno, msg); });
+        [this](const config::Error& error){ this->onError(error); });
 }
 
 
@@ -91,7 +91,7 @@ void test_ConfigFile::file()
     QTest::ignoreMessage(QtWarningMsg, "line 23: line starts with whitespace, but no attribute has been defined yet");
     config::readFile(":/test.cfg",
         [this](const config::Entry& entry){ this->onAttributeFound(entry); },
-        [this](const int lineno, const QString& msg){ this->onError(lineno, msg); });
+        [this](const config::Error& error){ this->onError(error); });
 
     const decltype(m_entries) expected {
         config::Entry { 5, "key1", {"val"} },
