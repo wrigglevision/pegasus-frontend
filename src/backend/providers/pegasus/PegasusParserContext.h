@@ -2,6 +2,7 @@
 
 #include "modeldata/gaming/CollectionData.h"
 #include "modeldata/gaming/GameData.h"
+#include "providers/Provider.h"
 #include "utils/HashMap.h"
 #include "utils/MoveOnly.h"
 
@@ -69,13 +70,8 @@ struct FileFilter {
 };
 
 struct OutputVars {
-    HashMap<QString, modeldata::Collection>& collections;
-    HashMap<QString, std::vector<size_t>>& collection_childs;
-    std::vector<modeldata::Game>& games;
-
-    HashMap<QString, size_t> path_to_gameidx;
+    providers::SearchContext& sctx;
     std::vector<FileFilter> filters;
-
     MOVE_ONLY(OutputVars)
 };
 

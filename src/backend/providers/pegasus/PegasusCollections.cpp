@@ -56,6 +56,8 @@ const QString& single_line(const config::Entry& entry)
 
 QString find_metafile_in(const QString& dir_path)
 {
+    Q_ASSERT(!dir_path.isEmpty());
+
     // TODO: move metadata first after some transition period
     const QString possible_paths[] {
         dir_path + QStringLiteral("/collections.pegasus.txt"),
@@ -65,12 +67,15 @@ QString find_metafile_in(const QString& dir_path)
     };
 
     for (const QString& path : possible_paths) {
-        if (QFileInfo::exists(path))
+        if (QFileInfo::exists(path)) {
+            qInfo().noquote() << MSG_PREFIX
+                << tr_log("found `%1`").arg(path);
             return path;
+        }
     }
 
     qWarning().noquote() << MSG_PREFIX
-        << tr_log("No metadata file found in %1, directory ignored").arg(dir_path);
+        << tr_log("No metadata file found in `%1`, directory ignored").arg(dir_path);
     return QString();
 }
 
@@ -170,7 +175,7 @@ void parse_collection_entry(ParserContext& ctx, const config::Entry& entry)
 
 void parse_game_entry(ParserContext& ctx, const config::Entry& entry)
 {
-    Q_ASSERT(ctx.cur_coll);
+    // NOTE: ctx.cur_coll may be null (ie. a game entry defined before any collection)
     Q_ASSERT(ctx.cur_game);
 
     if (!ctx.helpers.game_attribs.count(entry.key)) {
@@ -187,8 +192,9 @@ void parse_game_entry(ParserContext& ctx, const config::Entry& entry)
 
                 const QString abs_path = finfo.absoluteFilePath();
                 const QString can_path = finfo.canonicalFilePath();
+
                 ctx.cur_game->files.emplace(abs_path, finfo);
-                ctx.outvars.path_to_gameidx[can_path] = ctx.outvars.games.size() - 1;
+                ctx.outvars.sctx.path_to_gameidx[can_path] = ctx.outvars.sctx.games.size() - 1;
             }
             break;
         case GameAttrib::DEVELOPERS:
@@ -217,7 +223,7 @@ void parse_game_entry(ParserContext& ctx, const config::Entry& entry)
             ctx.cur_game->summary = config::mergeLines(entry.values);
             break;
         case GameAttrib::LONG_DESC:
-            ctx.cur_game->summary = config::mergeLines(entry.values);
+            ctx.cur_game->description = config::mergeLines(entry.values);
             break;
         case GameAttrib::RELEASE:
             {
@@ -264,7 +270,7 @@ void parse_game_entry(ParserContext& ctx, const config::Entry& entry)
 // The actual asset type check may still fail however.
 bool parse_asset_entry_maybe(ParserContext& ctx, const config::Entry& entry)
 {
-    Q_ASSERT(ctx.cur_coll);
+    Q_ASSERT(ctx.cur_coll || ctx.cur_game);
 
     const auto rx_match = ctx.helpers.rx_asset_key.match(entry.key);
     if (!rx_match.hasMatch())
@@ -286,14 +292,16 @@ bool parse_asset_entry_maybe(ParserContext& ctx, const config::Entry& entry)
 
 void parse_entry(ParserContext& ctx, const config::Entry& entry)
 {
+    //qDebug() << "parsing" << entry.key << entry.values;
+
     // TODO: set cur_* by the return value of emplace
     if (entry.key == QLatin1String("collection")) {
         const QString& name = single_line(entry);
 
-        if (!ctx.outvars.collections.count(name))
-            ctx.outvars.collections.emplace(name, modeldata::Collection(name));
+        if (!ctx.outvars.sctx.collections.count(name))
+            ctx.outvars.sctx.collections.emplace(name, modeldata::Collection(name));
 
-        ctx.cur_coll = &ctx.outvars.collections.at(name);
+        ctx.cur_coll = &ctx.outvars.sctx.collections.at(name);
         ctx.cur_game = nullptr;
 
         ctx.outvars.filters.emplace_back(name, ctx.dir_path);
@@ -302,8 +310,8 @@ void parse_entry(ParserContext& ctx, const config::Entry& entry)
     }
 
     if (entry.key == QLatin1String("game")) {
-        ctx.outvars.games.emplace_back(single_line(entry));
-        ctx.cur_game = &ctx.outvars.games.back();
+        ctx.outvars.sctx.games.emplace_back(single_line(entry));
+        ctx.cur_game = &ctx.outvars.sctx.games.back();
         return;
     }
 
@@ -339,6 +347,9 @@ void tidy_filters(ParserContext& ctx)
 
 void read_metafile(const QString& metafile_path, OutputVars& output, const Helpers& helpers)
 {
+    //Q_ASSERT(!metafile_path.isEmpty());
+    //qDebug() << "read_metafile" << metafile_path;
+
     ParserContext ctx(metafile_path, output, helpers);
 
     const auto on_error = [&](const config::Error& error){
@@ -387,6 +398,7 @@ void process_filter(const FileFilter& filter, OutputVars& out)
 
     for (const QString& filter_dir : filter.directories)
     {
+        //qDebug() << "Running filter for" << filter.collection_name << "in" << filter_dir;
         const QVector<QString> dirs_to_check = filter_find_dirs(filter_dir);
         for (const QString& subdir : dirs_to_check) {
             QDirIterator subdir_it(subdir, entry_filters, entry_flags);
@@ -408,18 +420,20 @@ void process_filter(const FileFilter& filter, OutputVars& out)
                     continue;
 
                 const QString game_path = fileinfo.canonicalFilePath();
-                if (!out.path_to_gameidx.count(game_path)) {
+                if (!out.sctx.path_to_gameidx.count(game_path)) {
                     // This means there weren't any game entries with matching file entry
                     // in any of the parsed metadata files. There is no existing game data
                     // created yet either.
-                    modeldata::Collection& parent = out.collections.at(filter.collection_name);
+                    modeldata::Collection& parent = out.sctx.collections.at(filter.collection_name);
                     modeldata::Game game(fileinfo);
                     game.launch_cmd = parent.launch_cmd;
                     game.launch_workdir = parent.launch_workdir;
-                    out.games.emplace_back(std::move(game));
+
+                    out.sctx.path_to_gameidx.emplace(game_path, out.sctx.games.size());
+                    out.sctx.games.emplace_back(std::move(game));
                 }
-                const size_t game_idx = out.path_to_gameidx.at(game_path);
-                out.collection_childs[filter.collection_name].emplace_back(game_idx);
+                const size_t game_idx = out.sctx.path_to_gameidx.at(game_path);
+                out.sctx.collection_childs[filter.collection_name].emplace_back(game_idx);
             }
         }
     }
@@ -432,19 +446,19 @@ namespace providers {
 namespace pegasus {
 
 void PegasusCollections::find_in_dirs(const std::vector<QString>& dir_list,
-                                      std::vector<modeldata::Game>& games,
-                                      HashMap<QString, modeldata::Collection>& collections,
-                                      HashMap<QString, std::vector<size_t>>& collection_childs,
+                                      providers::SearchContext& sctx,
                                       const std::function<void(int)>& update_gamecount_maybe) const
 {
     const Helpers helpers;
-    OutputVars output { collections, collection_childs, games, {}, {} };
+    OutputVars output { sctx, {} };
 
     for (const QString& dir_path : dir_list) {
+        //qDebug() << "Checking dir " << dir_path;
         const QString metafile = find_metafile_in(dir_path);
         if (metafile.isEmpty())
             continue;
 
+        //qDebug() << "Reading " << metafile;
         read_metafile(metafile, output, helpers);
     }
     for (const FileFilter& filter : output.filters)
@@ -452,7 +466,8 @@ void PegasusCollections::find_in_dirs(const std::vector<QString>& dir_list,
 
     // remove empty games
 
-    update_gamecount_maybe(static_cast<int>(games.size()));
+    update_gamecount_maybe(static_cast<int>(sctx.games.size()));
+    //qDebug() << "find_in_dirs complete";
 }
 
 } // namespace pegasus

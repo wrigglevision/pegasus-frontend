@@ -36,7 +36,7 @@ void testStrAndList(std::function<void(modeldata::Game&, const QString&)> fn_add
                     const char* str_name,
                     const char* list_name)
 {
-    modeldata::Game modeldata({});
+    modeldata::Game modeldata("test");
     fn_add(modeldata, "test1");
     fn_add(modeldata, "test2");
     fn_add(modeldata, "test3");
@@ -67,7 +67,7 @@ void test_Game::genres()
 
 void test_Game::release()
 {
-    modeldata::Game modeldata({});
+    modeldata::Game modeldata("test");
     modeldata.release_date = QDate(1999,1,2);
 
     model::Game game(std::move(modeldata));
@@ -78,7 +78,7 @@ void test_Game::release()
 
 void test_Game::launch()
 {
-    model::Game game(modeldata::Game({}));
+    model::Game game(modeldata::Game("test"));
 
     QSignalSpy spy_launch(&game, &model::Game::launchRequested);
     QVERIFY(spy_launch.isValid());

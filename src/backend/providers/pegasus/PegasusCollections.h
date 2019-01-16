@@ -18,6 +18,7 @@
 #pragma once
 
 #include "utils/FwdDeclModelData.h"
+#include "providers/Provider.h"
 #include "utils/HashMap.h"
 
 #include <QString>
@@ -32,9 +33,7 @@ class PegasusCollections {
 public:
     PegasusCollections() = default;
     void find_in_dirs(const std::vector<QString>&,
-                      std::vector<modeldata::Game>&,
-                      HashMap<QString, modeldata::Collection>&,
-                      HashMap<QString, std::vector<size_t>>&,
+                      providers::SearchContext&,
                       const std::function<void(int)>&) const;
 };
 

@@ -26,7 +26,7 @@ Game::Game(modeldata::Game game, QObject* parent)
     , m_game(std::move(game))
     , m_assets(&m_game.assets, this)
 {
-    Q_ASSERT(!m_game.launch_cmd.isEmpty() || !m_game.files.empty());
+    // Q_ASSERT(!m_game.launch_cmd.isEmpty());
 
     for (auto& entry : m_game.files)
         m_files.append(new model::GameFile(entry.first, std::move(entry.second), this));
