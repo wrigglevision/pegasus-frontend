@@ -95,8 +95,12 @@ void readStream(QTextStream& stream,
             continue;
 
         const QStringRef trimmed_line = line.leftRef(-1).trimmed();
+        if (trimmed_line.isEmpty()) {
+            close_current_attrib();
+            continue;
+        }
 
-        // multiline (starts with whitespace but trimmed_line is not empty)
+        // multiline (starts with whitespace but also has content)
         if (line.at(0).isSpace()) {
             if (entry.key.isEmpty()) {
                 onError({ linenum, tr_log("line starts with whitespace, but no attribute has been defined yet") });
