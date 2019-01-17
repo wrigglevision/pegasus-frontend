@@ -23,6 +23,40 @@
 #include "utils/HashMap.h"
 
 #include <QString>
+#include <QStringList>
+
+
+namespace {
+
+void verify_collected_files(providers::SearchContext& ctx, const HashMap<QString, QStringList>& coll_files_map)
+{
+    for (const auto& entry : coll_files_map) {
+        const QString& coll_name = entry.first;
+        const QStringList& coll_files = entry.second;
+
+        std::vector<size_t> expected_indices;
+
+        for (const QString& abs_path : coll_files) {
+            const QString can_path = QFileInfo(abs_path).canonicalFilePath();
+            QVERIFY(!can_path.isEmpty());
+
+            QVERIFY(ctx.path_to_gameidx.count(can_path));
+            const size_t game_idx = ctx.path_to_gameidx.at(can_path);
+
+            QVERIFY(game_idx < ctx.games.size());
+            QVERIFY(ctx.games.at(game_idx).files.count(abs_path));
+            expected_indices.emplace_back(game_idx);
+        }
+
+        std::vector<size_t> actual_indices = ctx.collection_childs.at(coll_name);
+
+        std::sort(actual_indices.begin(), actual_indices.end());
+        std::sort(expected_indices.begin(), expected_indices.end());
+        QCOMPARE(actual_indices, expected_indices);
+    }
+}
+
+} // namespace
 
 
 class test_PegasusProvider : public QObject {
@@ -32,9 +66,9 @@ private slots:
     void empty();
     void simple();
     void with_meta();
-    /*void asset_search();
+    void asset_search();
     void custom_assets();
-    void custom_directories();*/
+    void custom_directories();
 };
 
 void test_PegasusProvider::empty()
@@ -71,54 +105,28 @@ void test_PegasusProvider::simple()
     QVERIFY(ctx.collection_childs.at(QStringLiteral("Multi-game ROMs")).size() == 1);
 
     // finds the correct files for the collections
-    const QStringList mygames_paths {
-        { ":/simple/mygame1.ext" },
-        { ":/simple/mygame2.ext" },
-        { ":/simple/mygame3.ext" },
-        { ":/simple/favgame1.ext" },
-        { ":/simple/favgame2.ext" },
-        { ":/simple/game with spaces.ext" },
-        { ":/simple/9999-in-1.ext" },
-        { ":/simple/subdir/game_in_subdir.ext" },
-    };
-    const QStringList faves_paths {
-        { ":/simple/favgame1.ext" },
-        { ":/simple/favgame2.ext" },
-        { ":/simple/game with spaces.ext" },
-    };
-    const QStringList multi_paths {
-        { ":/simple/9999-in-1.ext" },
-    };
-    const HashMap<QString, const QStringList* const> coll_files_map {
-        { QStringLiteral("My Games"), &mygames_paths },
-        { QStringLiteral("Favorite games"), &faves_paths },
-        { QStringLiteral("Multi-game ROMs"), &multi_paths },
+    const HashMap<QString, QStringList> coll_files_map {
+        { QStringLiteral("My Games"), {
+            { ":/simple/mygame1.ext" },
+            { ":/simple/mygame2.ext" },
+            { ":/simple/mygame3.ext" },
+            { ":/simple/favgame1.ext" },
+            { ":/simple/favgame2.ext" },
+            { ":/simple/game with spaces.ext" },
+            { ":/simple/9999-in-1.ext" },
+            { ":/simple/subdir/game_in_subdir.ext" },
+        }},
+        { QStringLiteral("Favorite games"), {
+            { ":/simple/favgame1.ext" },
+            { ":/simple/favgame2.ext" },
+            { ":/simple/game with spaces.ext" },
+        }},
+        { QStringLiteral("Multi-game ROMs"), {
+            { ":/simple/9999-in-1.ext" },
+        }},
     };
 
-    for (const auto& entry : coll_files_map) {
-        const QString& coll_name = entry.first;
-        const QStringList& coll_files = *entry.second;
-
-        std::vector<size_t> expected_indices;
-
-        for (const QString& path : coll_files) {
-            QVERIFY(ctx.path_to_gameidx.count(path));
-            const size_t game_idx = ctx.path_to_gameidx.at(path);
-
-            // NOTE: paths are not canonical in game.files,
-            // just that in these tests they happen to be the same
-            QVERIFY(game_idx < ctx.games.size());
-            QVERIFY(ctx.games.at(game_idx).files.count(path));
-
-            expected_indices.emplace_back(game_idx);
-        }
-
-        std::vector<size_t> actual_indices = ctx.collection_childs.at(coll_name);
-
-        std::sort(actual_indices.begin(), actual_indices.end());
-        std::sort(expected_indices.begin(), expected_indices.end());
-        QCOMPARE(actual_indices, expected_indices);
-    }
+    verify_collected_files(ctx, coll_files_map);
 }
 
 void test_PegasusProvider::with_meta()
@@ -201,102 +209,95 @@ void test_PegasusProvider::with_meta()
     }
 }
 
-/*void test_PegasusProvider::asset_search()
+void test_PegasusProvider::asset_search()
 {
-    HashMap<QString, modeldata::Game> games;
-    HashMap<QString, modeldata::Collection> collections;
-    HashMap<QString, std::vector<QString>> collection_childs;
+    providers::SearchContext ctx;
 
+    QTest::ignoreMessage(QtInfoMsg, "Collections: found `:/asset_search/metadata.txt`");
     providers::pegasus::PegasusProvider provider({QStringLiteral(":/asset_search")});
-
-    QTest::ignoreMessage(QtInfoMsg, "Collections: found `:/asset_search/collections.txt`");
-    provider.findLists(games, collections, collection_childs);
-    provider.findStaticData(games, collections, collection_childs);
+    provider.findLists(ctx);
+    provider.findStaticData(ctx);
 
     const QString collection_name(QStringLiteral("mygames"));
-    QVERIFY(collections.size() == 1);
-    QVERIFY(collections.count(collection_name) == 1);
-    QVERIFY(games.size() == 4);
+    QVERIFY(ctx.collections.size() == 1);
+    QVERIFY(ctx.collections.count(collection_name) == 1);
+    QVERIFY(ctx.games.size() == 4);
 
-    auto game_it = games.find(QStringLiteral(":/asset_search/mygame1.ext"));
-    QVERIFY(game_it != games.cend());
-    QCOMPARE(game_it->second.assets.single(AssetType::BOX_FRONT),
-             QStringLiteral("file::/asset_search/media/mygame1/box_front.png"));
-    QCOMPARE(game_it->second.assets.multi(AssetType::VIDEOS),
-             { QStringLiteral("file::/asset_search/media/mygame1/video.mp4") });
+    auto path = QStringLiteral(":/asset_search/mygame1.ext");
+    QVERIFY(ctx.path_to_gameidx.count(path));
+    QVERIFY(ctx.path_to_gameidx.at(path) < ctx.games.size());
+    modeldata::Game* game = &ctx.games.at(ctx.path_to_gameidx.at(path));
+    QCOMPARE(game->assets.single(AssetType::BOX_FRONT),
+        QStringLiteral("file::/asset_search/media/mygame1/box_front.png"));
+    QCOMPARE(game->assets.multi(AssetType::VIDEOS),
+        { QStringLiteral("file::/asset_search/media/mygame1/video.mp4") });
 
-    game_it = games.find(QStringLiteral(":/asset_search/mygame3.ext"));
-    QVERIFY(game_it != games.cend());
-    QCOMPARE(game_it->second.assets.multi(AssetType::SCREENSHOTS),
-             { QStringLiteral("file::/asset_search/media/mygame3/screenshot.jpg") });
-    QCOMPARE(game_it->second.assets.single(AssetType::MUSIC),
-             QStringLiteral("file::/asset_search/media/mygame3/music.mp3"));
+    path = QStringLiteral(":/asset_search/mygame3.ext");
+    QVERIFY(ctx.path_to_gameidx.count(path));
+    QVERIFY(ctx.path_to_gameidx.at(path) < ctx.games.size());
+    game = &ctx.games.at(ctx.path_to_gameidx.at(path));
+    QCOMPARE(game->assets.multi(AssetType::SCREENSHOTS),
+        { QStringLiteral("file::/asset_search/media/mygame3/screenshot.jpg") });
+    QCOMPARE(game->assets.single(AssetType::MUSIC),
+        QStringLiteral("file::/asset_search/media/mygame3/music.mp3"));
 
-    game_it = games.find(QStringLiteral(":/asset_search/subdir/mygame4.ext"));
-    QVERIFY(game_it != games.cend());
-    QCOMPARE(game_it->second.assets.single(AssetType::BACKGROUND),
-             QStringLiteral("file::/asset_search/media/subdir/mygame4/background.png"));
+    path = QStringLiteral(":/asset_search/subdir/mygame4.ext");
+    QVERIFY(ctx.path_to_gameidx.count(path));
+    QVERIFY(ctx.path_to_gameidx.at(path) < ctx.games.size());
+    game = &ctx.games.at(ctx.path_to_gameidx.at(path));
+    QCOMPARE(game->assets.single(AssetType::BACKGROUND),
+        QStringLiteral("file::/asset_search/media/subdir/mygame4/background.png"));
 }
 
 void test_PegasusProvider::custom_assets()
 {
-    HashMap<QString, modeldata::Game> games;
-    HashMap<QString, modeldata::Collection> collections;
-    HashMap<QString, std::vector<QString>> collection_childs;
+    providers::SearchContext ctx;
 
-    QTest::ignoreMessage(QtInfoMsg, "Collections: found `:/custom_assets/collections.txt`");
     QTest::ignoreMessage(QtInfoMsg, "Collections: found `:/custom_assets/metadata.txt`");
     providers::pegasus::PegasusProvider provider({QStringLiteral(":/custom_assets")});
-    provider.findLists(games, collections, collection_childs);
-    provider.findStaticData(games, collections, collection_childs);
+    provider.findLists(ctx);
+    provider.findStaticData(ctx);
 
-    QVERIFY(collections.size() == 1);
-    QVERIFY(games.size() == 1);
+    QVERIFY(ctx.collections.size() == 1);
+    QVERIFY(ctx.games.size() == 1);
 
-    const QString game_key = QStringLiteral(":/custom_assets/mygame1.ext");
-    QCOMPARE(games.count(game_key) > 0, true);
-    QCOMPARE(games.at(game_key).assets.single(AssetType::BOX_FRONT),
-             QStringLiteral("file::/custom_assets/different_dir/whatever.png"));
+    const auto path = QStringLiteral(":/custom_assets/mygame1.ext");
+    QVERIFY(ctx.path_to_gameidx.count(path));
+    QVERIFY(ctx.path_to_gameidx.at(path) < ctx.games.size());
+    modeldata::Game& game = ctx.games.at(ctx.path_to_gameidx.at(path));
+    QCOMPARE(game.assets.single(AssetType::BOX_FRONT),
+        QStringLiteral("file::/custom_assets/different_dir/whatever.png"));
 }
 
 void test_PegasusProvider::custom_directories()
 {
-    HashMap<QString, modeldata::Game> games;
-    HashMap<QString, modeldata::Collection> collections;
-    HashMap<QString, std::vector<QString>> collection_childs;
+    providers::SearchContext ctx;
 
-    QTest::ignoreMessage(QtInfoMsg, "Collections: found `:/custom_dirs/coll/collections.txt`");
+    QTest::ignoreMessage(QtInfoMsg, "Collections: found `:/custom_dirs/coll/metadata.txt`");
     providers::pegasus::PegasusProvider provider({QStringLiteral(":/custom_dirs/coll")});
-    provider.findLists(games, collections, collection_childs);
-    provider.findStaticData(games, collections, collection_childs);
+    provider.findLists(ctx);
+    provider.findStaticData(ctx);
 
-    QVERIFY(collections.size() == 2);
-    QVERIFY(collections.count(QStringLiteral("x-files")) == 1);
-    QVERIFY(collections.count(QStringLiteral("y-files")) == 1);
-    QVERIFY(games.size() == 5);
-    QVERIFY(collection_childs.at(QStringLiteral("x-files")).size() == 4);
-    QVERIFY(collection_childs.at(QStringLiteral("y-files")).size() == 1);
+    QVERIFY(ctx.collections.size() == 2);
+    QVERIFY(ctx.collections.count(QStringLiteral("x-files")) == 1);
+    QVERIFY(ctx.collections.count(QStringLiteral("y-files")) == 1);
+    QVERIFY(ctx.games.size() == 5);
+    QVERIFY(ctx.collection_childs.at(QStringLiteral("x-files")).size() == 4);
+    QVERIFY(ctx.collection_childs.at(QStringLiteral("y-files")).size() == 1);
 
-    // NOTE: Apparently canonicalFilePath doesn't work with QRC resources...
-    const QStringList xfiles {
-        { ":/custom_dirs/coll/../a/mygame.x" },
-        { ":/custom_dirs/coll/../b/mygame.x" },
-        { ":/custom_dirs/c/mygame.x" },
-        { ":/custom_dirs/coll/mygame.x" },
+    const HashMap<QString, QStringList> coll_files_map {
+        { QStringLiteral("x-files"), {
+            { ":/custom_dirs/coll/../a/mygame.x" },
+            { ":/custom_dirs/coll/../b/mygame.x" },
+            { ":/custom_dirs/c/mygame.x" },
+            { ":/custom_dirs/coll/mygame.x" },
+        }},
+        { QStringLiteral("y-files"), {
+            { ":/custom_dirs/coll/../b/mygame.y" },
+        }},
     };
-    const QStringList yfiles {
-        { ":/custom_dirs/coll/../b/mygame.y" },
-    };
-
-    for (const QString& game_key : collection_childs.at(QStringLiteral("x-files"))) {
-        const modeldata::Game& game = games.at(game_key);
-        QCOMPARE(xfiles.contains(game.fileinfo().canonicalFilePath()), true);
-    }
-    for (const QString& game_key : collection_childs.at(QStringLiteral("y-files"))) {
-        const modeldata::Game& game = games.at(game_key);
-        QCOMPARE(yfiles.contains(game.fileinfo().canonicalFilePath()), true);
-    }
-}*/
+    verify_collected_files(ctx, coll_files_map);
+}
 
 
 QTEST_MAIN(test_PegasusProvider)

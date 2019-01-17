@@ -21,7 +21,6 @@
         <file>with_meta/media/game_ignored.ext</file>
         <file>with_meta/subdir/game_in_subdir.ext</file>
         <file>with_meta/metadata.pegasus.txt</file>
-        <file>custom_assets/collections.txt</file>
         <file>custom_assets/metadata.txt</file>
         <file>custom_assets/mygame1.ext</file>
         <file>custom_assets/media/mygame1-boxFront.png</file>
@@ -32,9 +31,9 @@
         <file>custom_dirs/b/mygame.y</file>
         <file>custom_dirs/c/mygame.x</file>
         <file>custom_dirs/c/mygame.y</file>
-        <file>custom_dirs/coll/collections.txt</file>
+        <file>custom_dirs/coll/metadata.txt</file>
         <file>custom_dirs/coll/mygame.x</file>
-        <file>asset_search/collections.txt</file>
+        <file>asset_search/metadata.txt</file>
         <file>asset_search/mygame1.ext</file>
         <file>asset_search/mygame2.ext</file>
         <file>asset_search/mygame3.ext</file>
