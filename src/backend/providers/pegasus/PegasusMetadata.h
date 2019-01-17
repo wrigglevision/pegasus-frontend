@@ -1,5 +1,5 @@
 // Pegasus Frontend
-// Copyright (C) 2017-2018  Mátyás Mustoha
+// Copyright (C) 2017-2019  Mátyás Mustoha
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,8 +17,7 @@
 
 #pragma once
 
-#include "utils/FwdDeclModelData.h"
-#include "utils/HashMap.h"
+#include "providers/Provider.h"
 
 #include <QString>
 #include <vector>
@@ -27,13 +26,7 @@
 namespace providers {
 namespace pegasus {
 
-class PegasusMetadata {
-public:
-    PegasusMetadata();
-
-    void enhance_in_dirs(const std::vector<QString>&,
-                         std::vector<modeldata::Game>&) const;
-};
+void find_in_dirs(const std::vector<QString>&, providers::SearchContext&);
 
 } // namespace pegasus
 } // namespace providers

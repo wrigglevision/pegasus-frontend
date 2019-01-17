@@ -38,7 +38,6 @@ struct GameFile {
     // QString launch_cmd;
     // QString launch_workdir;
 
-    GameFile();
     explicit GameFile(const QFileInfo&);
     MOVE_ONLY(GameFile)
 };
@@ -48,7 +47,7 @@ struct Game {
     explicit Game(QString title);
     MOVE_ONLY(Game)
 
-    const QString title;
+    QString title;
     QString summary;
     QString description;
 

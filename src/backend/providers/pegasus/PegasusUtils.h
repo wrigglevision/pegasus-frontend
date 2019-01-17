@@ -1,5 +1,5 @@
 // Pegasus Frontend
-// Copyright (C) 2017-2018  Mátyás Mustoha
+// Copyright (C) 2017-2019  Mátyás Mustoha
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,25 +17,17 @@
 
 #pragma once
 
-#include "utils/FwdDeclModelData.h"
-#include "providers/Provider.h"
-#include "utils/HashMap.h"
-
 #include <QString>
-#include <functional>
-#include <vector>
+#include <QStringList>
 
 
 namespace providers {
 namespace pegasus {
+namespace utils {
 
-class PegasusCollections {
-public:
-    PegasusCollections() = default;
-    void find_in_dirs(const std::vector<QString>&,
-                      providers::SearchContext&,
-                      const std::function<void(int)>&) const;
-};
+QStringList tokenize_by_comma(const QString&);
+QString assetline_to_url(const QString&, const QString&);
 
+} // namespace utils
 } // namespace pegasus
 } // namespace providers

@@ -1,5 +1,5 @@
 // Pegasus Frontend
-// Copyright (C) 2017-2018  Mátyás Mustoha
+// Copyright (C) 2017-2019  Mátyás Mustoha
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -20,6 +20,8 @@
 #include "AppSettings.h"
 #include "LocaleUtils.h"
 #include "Paths.h"
+#include "PegasusMetadata.h"
+#include "PegasusMedia.h"
 
 #include <QDebug>
 #include <QFile>
@@ -69,13 +71,13 @@ PegasusProvider::PegasusProvider(std::vector<QString> game_dirs, QObject* parent
 
 void PegasusProvider::findLists(SearchContext& ctx)
 {
-    collection_finder.find_in_dirs(m_game_dirs, ctx,
-                                   [this](int game_count){ emit gameCountChanged(game_count); });
+    find_in_dirs(m_game_dirs, ctx);
+    emit gameCountChanged(static_cast<int>(ctx.games.size()));
 }
 
 void PegasusProvider::findStaticData(SearchContext& ctx)
 {
-    metadata_finder.enhance_in_dirs(m_game_dirs, ctx.games);
+    find_assets(m_game_dirs, ctx.games);
 }
 
 } // namespace pegasus

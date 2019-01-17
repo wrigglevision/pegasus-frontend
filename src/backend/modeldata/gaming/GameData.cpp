@@ -30,7 +30,6 @@ QString pretty_filename(const QFileInfo& fi)
 
 namespace modeldata {
 
-GameFile::GameFile() = default;
 GameFile::GameFile(const QFileInfo& fi)
     : name(pretty_filename(fi))
 {}

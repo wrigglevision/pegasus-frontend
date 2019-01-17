@@ -1,26 +1,17 @@
 HEADERS += \
     $$PWD/Provider.h \
     $$PWD/ProviderManager.h \
-    $$PWD/pegasus/PegasusCollections.h \
-    $$PWD/pegasus/PegasusCommon.h \
-    $$PWD/pegasus/PegasusMetadata.h \
-    $$PWD/pegasus/PegasusProvider.h \
     #$$PWD/pegasus_favorites/Favorites.h \
     #$$PWD/pegasus_playtime/PlaytimeStats.h \
-    $$PWD/EnabledProviders.h \
-    $$PWD/pegasus/PegasusParserContext.h
+    $$PWD/EnabledProviders.h
 
 SOURCES += \
     $$PWD/Provider.cpp \
     $$PWD/ProviderManager.cpp \
-    $$PWD/pegasus/PegasusCollections.cpp \
-    $$PWD/pegasus/PegasusCommon.cpp \
-    $$PWD/pegasus/PegasusMetadata.cpp \
-    $$PWD/pegasus/PegasusProvider.cpp \
     #$$PWD/pegasus_favorites/Favorites.cpp \
     #$$PWD/pegasus_playtime/PlaytimeStats.cpp \
-    $$PWD/pegasus/PegasusParserContext.cpp
 
+include(pegasus/pegasus.pri)
 
 contains(QMAKE_CXX, ".*arm.*")|contains(QMAKE_CXX, ".*aarch.*"): target_arm = yes
 unix:!macx:!android:!defined(target_arm, var): pclinux = yes
