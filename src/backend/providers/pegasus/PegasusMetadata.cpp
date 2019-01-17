@@ -433,6 +433,7 @@ void find_in_dirs(const std::vector<QString>& dir_list, providers::SearchContext
         process_filter(filter, output);
 
     // remove empty games
+    // TODO: make this stricter and update the paths and collections on remove
     auto it = std::remove_if(sctx.games.begin(), sctx.games.end(),
         [](const modeldata::Game& game) { return game.launch_cmd.isEmpty() && game.files.empty(); });
     sctx.games.erase(it, sctx.games.end());
