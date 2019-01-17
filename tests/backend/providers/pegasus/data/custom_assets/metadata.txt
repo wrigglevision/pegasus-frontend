@@ -1,5 +1,6 @@
 collection: mygames
 extensions: ext
+assets.cartridge: my_collection_assets/cartridge.png
 
 game: Example Game
 file: mygame1.ext

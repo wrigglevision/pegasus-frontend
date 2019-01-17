@@ -3,10 +3,13 @@ game: Pre
 file: pre.ext
 
 
-collection: mygames
+collection: My Games
+shortname: mygames
 extensions: ext
 summary: this is the summary
 description: this is the description
+launch: launcher.exe "{file.path}"
+workdir: some/workdir
 
 
 # Test basic metadata
@@ -15,6 +18,7 @@ file: basic.ext
 # repeating multi keys will append
 developer: Dev
 developer: Dev with Spaces
+publisher: The Company
 genres:
   genre1
   genre2
@@ -25,6 +29,8 @@ rating: 80%
 release: 1998
 release: 1998-05
 x-something: ignored
+summary: something short
+  here
 description: a very
   long
   .
@@ -45,3 +51,15 @@ files:
 # Test launch-only entries
 game: Virtual Game
 launch: runme.exe param1 param2
+workdir: some/dir/here
+
+
+# Check some more interesting cases
+game: Horse
+launch: dummy
+rating: asd
+rating: 0.7
+release: 123465
+release: 45-1992
+release: 1992-45
+asd: asdasd

@@ -210,7 +210,7 @@ void parse_game_entry(ParserContext& ctx, const config::Entry& entry)
                 }
                 const auto rx_match_b = ctx.helpers.rx_float.match(line);
                 if (rx_match_b.hasMatch()) {
-                    ctx.cur_game->rating = qBound(0.f, line.toFloat() / 100.f, 1.f);
+                    ctx.cur_game->rating = qBound(0.f, line.toFloat(), 1.f);
                     return;
                 }
 
@@ -245,7 +245,7 @@ bool parse_asset_entry_maybe(ParserContext& ctx, const config::Entry& entry)
 
     modeldata::GameAssets& assets = ctx.cur_game
         ? ctx.cur_game->assets
-        : ctx.cur_coll->default_assets;
+        : ctx.cur_coll->assets;
     assets.addUrlMaybe(asset_type, assetline_to_url(entry.values.first(), ctx.dir_path));
     return true;
 }
@@ -270,7 +270,12 @@ void parse_entry(ParserContext& ctx, const config::Entry& entry)
     }
 
     if (entry.key == QLatin1String("game")) {
-        ctx.outvars.sctx.games.emplace_back(first_line_of(entry));
+        modeldata::Game game(first_line_of(entry));
+        if (ctx.cur_coll) {
+            game.launch_cmd = ctx.cur_coll->launch_cmd;
+            game.launch_workdir = ctx.cur_coll->launch_workdir;
+        }
+        ctx.outvars.sctx.games.emplace_back(std::move(game));
         ctx.cur_game = &ctx.outvars.sctx.games.back();
         return;
     }
@@ -376,12 +381,12 @@ void process_filter(const FileFilter& filter, OutputVars& out)
                 if (!include)
                     continue;
 
+                const modeldata::Collection& parent = out.sctx.collections.at(filter.collection_name);
                 const QString game_path = fileinfo.canonicalFilePath();
                 if (!out.sctx.path_to_gameidx.count(game_path)) {
                     // This means there weren't any game entries with matching file entry
                     // in any of the parsed metadata files. There is no existing game data
                     // created yet either.
-                    const modeldata::Collection& parent = out.sctx.collections.at(filter.collection_name);
                     modeldata::Game game(fileinfo);
                     game.launch_cmd = parent.launch_cmd;
                     game.launch_workdir = parent.launch_workdir;
@@ -391,6 +396,13 @@ void process_filter(const FileFilter& filter, OutputVars& out)
                 }
                 const size_t game_idx = out.sctx.path_to_gameidx.at(game_path);
                 out.sctx.collection_childs[filter.collection_name].emplace_back(game_idx);
+
+                // Corner case: a game was defined earlier than its collection
+                modeldata::Game& game = out.sctx.games.at(game_idx);
+                if (game.launch_cmd.isEmpty())
+                    game.launch_cmd = parent.launch_cmd;
+                if (game.launch_workdir.isEmpty())
+                    game.launch_workdir = parent.launch_workdir;
             }
         }
     }

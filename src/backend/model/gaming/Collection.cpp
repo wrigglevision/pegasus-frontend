@@ -24,7 +24,7 @@ Collection::Collection(modeldata::Collection collection, QObject* parent)
     : QObject(parent)
     , m_games(this)
     , m_collection(std::move(collection))
-    , m_default_assets(&m_collection.default_assets, this)
+    , m_assets(&m_collection.assets, this)
 {}
 
 void Collection::setGameList(QVector<Game*> games)

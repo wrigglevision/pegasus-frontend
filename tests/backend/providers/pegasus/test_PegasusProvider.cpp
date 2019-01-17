@@ -134,15 +134,31 @@ void test_PegasusProvider::with_meta()
     providers::SearchContext ctx;
 
     QTest::ignoreMessage(QtInfoMsg, "Collections: found `:/with_meta/metadata.pegasus.txt`");
+    QTest::ignoreMessage(QtWarningMsg, "Collections: `:/with_meta/metadata.pegasus.txt`, line 60: failed to parse rating value");
+    QTest::ignoreMessage(QtWarningMsg, "Collections: `:/with_meta/metadata.pegasus.txt`, line 62: incorrect date format, should be YYYY, YYYY-MM or YYYY-MM-DD");
+    QTest::ignoreMessage(QtWarningMsg, "Collections: `:/with_meta/metadata.pegasus.txt`, line 63: incorrect date format, should be YYYY, YYYY-MM or YYYY-MM-DD");
+    QTest::ignoreMessage(QtWarningMsg, "Collections: `:/with_meta/metadata.pegasus.txt`, line 65: unrecognized game property `asd`, ignored");
+
     providers::pegasus::PegasusProvider provider({QStringLiteral(":/with_meta")});
     provider.findLists(ctx);
 
-    const QString collection_name(QStringLiteral("mygames"));
     QCOMPARE(static_cast<int>(ctx.collections.size()), 1);
-    QCOMPARE(static_cast<int>(ctx.collections.count(collection_name)), 1);
-    QCOMPARE(ctx.collections.at(collection_name).summary, QStringLiteral("this is the summary"));
-    QCOMPARE(ctx.collections.at(collection_name).description, QStringLiteral("this is the description"));
-    QCOMPARE(static_cast<int>(ctx.games.size()), 5);
+    QCOMPARE(static_cast<int>(ctx.games.size()), 6);
+
+    const auto common_launch = QStringLiteral("launcher.exe \"{file.path}\"");
+    const auto common_workdir = QStringLiteral("some/workdir");
+
+    // Collection
+    {
+        const QString collection_name(QStringLiteral("My Games"));
+        QVERIFY(ctx.collections.count(collection_name));
+        const modeldata::Collection& coll = ctx.collections.at(collection_name);
+        QCOMPARE(coll.shortName(), QStringLiteral("mygames"));
+        QCOMPARE(coll.summary, QStringLiteral("this is the summary"));
+        QCOMPARE(coll.description, QStringLiteral("this is the description"));
+        QCOMPARE(coll.launch_cmd, common_launch);
+        QCOMPARE(coll.launch_workdir, common_workdir);
+    }
 
     // Game before the first collection entry
     {
@@ -150,6 +166,10 @@ void test_PegasusProvider::with_meta()
         QVERIFY(ctx.path_to_gameidx.count(file_path));
         const size_t game_idx = ctx.path_to_gameidx.at(file_path);
         QVERIFY(game_idx < ctx.games.size());
+
+        const modeldata::Game& game = ctx.games.at(game_idx);
+        QCOMPARE(game.launch_cmd, common_launch);
+        QCOMPARE(game.launch_workdir, common_workdir);
     }
 
     // Basic
@@ -162,11 +182,15 @@ void test_PegasusProvider::with_meta()
         const modeldata::Game& game = ctx.games.at(game_idx);
         QCOMPARE(game.title, QStringLiteral("A simple game"));
         QCOMPARE(game.developers, QStringList({"Dev", "Dev with Spaces"}));
+        QCOMPARE(game.publishers, QStringList({"The Company"}));
         QCOMPARE(game.genres, QStringList({"genre1", "genre2", "genre with spaces"}));
         QCOMPARE(game.player_count, 4);
         QCOMPARE(game.release_date, QDate(1998, 5, 1));
+        QCOMPARE(game.summary, QStringLiteral("something short here"));
         QCOMPARE(game.description, QStringLiteral("a very long\ndescription"));
-        QCOMPARE(game.summary, QString());
+        QCOMPARE(game.rating, 0.8f);
+        QCOMPARE(game.launch_cmd, common_launch);
+        QCOMPARE(game.launch_workdir, common_workdir);
         QCOMPARE(static_cast<int>(game.files.size()), 1);
         QCOMPARE(static_cast<int>(game.files.count(file_path)), 1);
     }
@@ -176,7 +200,12 @@ void test_PegasusProvider::with_meta()
         const QString file_path = QStringLiteral(":/with_meta/subdir/game_in_subdir.ext");
         QVERIFY(ctx.path_to_gameidx.count(file_path));
         const size_t game_idx = ctx.path_to_gameidx.at(file_path);
-        QCOMPARE(ctx.games.at(game_idx).title, QStringLiteral("Subdir Game"));
+        QVERIFY(game_idx < ctx.games.size());
+
+        const modeldata::Game& game = ctx.games.at(game_idx);
+        QCOMPARE(game.title, QStringLiteral("Subdir Game"));
+        QCOMPARE(game.launch_cmd, common_launch);
+        QCOMPARE(game.launch_workdir, common_workdir);
     }
 
     // Multifile
@@ -195,6 +224,8 @@ void test_PegasusProvider::with_meta()
         QCOMPARE(static_cast<int>(game.files.size()), 2);
         QCOMPARE(static_cast<int>(game.files.count(file_path_a)), 1);
         QCOMPARE(static_cast<int>(game.files.count(file_path_b)), 1);
+        QCOMPARE(game.launch_cmd, common_launch);
+        QCOMPARE(game.launch_workdir, common_workdir);
     }
 
     // Virtual
@@ -206,6 +237,19 @@ void test_PegasusProvider::with_meta()
         const modeldata::Game& game = *it;
         QCOMPARE(static_cast<int>(game.files.size()), 0);
         QCOMPARE(game.launch_cmd, QStringLiteral("runme.exe param1 param2"));
+        QCOMPARE(game.launch_workdir, QStringLiteral("some/dir/here"));
+    }
+
+    // Other cases
+    {
+        const auto it = std::find_if(ctx.games.cbegin(), ctx.games.cend(),
+            [](const modeldata::Game& game) { return game.title == QStringLiteral("Horse"); });
+        QVERIFY(it != ctx.games.cend());
+
+        const modeldata::Game& game = *it;
+        QCOMPARE(game.rating, 0.7f);
+        QCOMPARE(game.launch_cmd, QStringLiteral("dummy"));
+        QCOMPARE(game.launch_workdir, common_workdir);
     }
 }
 
@@ -260,6 +304,10 @@ void test_PegasusProvider::custom_assets()
 
     QVERIFY(ctx.collections.size() == 1);
     QVERIFY(ctx.games.size() == 1);
+
+    modeldata::Collection& coll = ctx.collections.begin()->second;
+    QCOMPARE(coll.assets.single(AssetType::CARTRIDGE),
+        QStringLiteral("file::/custom_assets/my_collection_assets/cartridge.png"));
 
     const auto path = QStringLiteral(":/custom_assets/mygame1.ext");
     QVERIFY(ctx.path_to_gameidx.count(path));

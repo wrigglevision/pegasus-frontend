@@ -41,7 +41,7 @@ struct Collection {
     QString summary;
     QString description;
 
-    GameAssets default_assets; // TODO: remove
+    GameAssets assets; // TODO: remove
 
     const QString& shortName() const { return m_short_name; }
     void setShortName(const QString&);
