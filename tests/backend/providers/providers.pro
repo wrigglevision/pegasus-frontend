@@ -2,5 +2,5 @@ TEMPLATE = subdirs
 
 SUBDIRS += \
     pegasus \
-    #favorites \
+    favorites \
     #playtime \

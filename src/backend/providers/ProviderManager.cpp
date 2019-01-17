@@ -85,7 +85,7 @@ void build_ui_layer(providers::SearchContext& ctx,
                     QThread* const ui_thread,
                     QQmlObjectListModel<model::Game>& game_model,
                     QQmlObjectListModel<model::Collection>& collection_model,
-                    HashMap<size_t, model::Game*>& gameid_to_q_game)
+                    HashMap<QString, model::Game*>& path_map)
 {
     QVector<model::Game*> q_games;
     q_games.reserve(static_cast<int>(ctx.games.size()));
@@ -94,10 +94,7 @@ void build_ui_layer(providers::SearchContext& ctx,
         auto qobj = new model::Game(std::move(ctx.games[i]));
         qobj->moveToThread(ui_thread);
         q_games.append(qobj);
-        gameid_to_q_game.emplace(i, q_games.last());
     }
-    sort_games(q_games);
-    game_model.append(q_games);
 
 
     QVector<model::Collection*> q_collections;
@@ -117,11 +114,23 @@ void build_ui_layer(providers::SearchContext& ctx,
 
         const std::vector<size_t>& game_keys = ctx.collection_childs[q_coll->name()];
         for (size_t game_key : game_keys)
-            q_childs.append(gameid_to_q_game.at(game_key));
+            q_childs.append(q_games.at(static_cast<int>(game_key)));
 
         sort_games(q_childs);
         q_coll->setGameList(q_childs);
     }
+
+
+    path_map.reserve(ctx.path_to_gameidx.size());
+    for (auto entry : ctx.path_to_gameidx) {
+        Q_ASSERT(entry.second < ctx.games.size());
+        model::Game* q_game = q_games.at(static_cast<int>(entry.second));
+        path_map.emplace(entry.first, q_game);
+    }
+
+
+    sort_games(q_games);
+    game_model.append(q_games);
 }
 } // namespace
 
@@ -177,16 +186,12 @@ void ProviderManager::startSearch(QQmlObjectListModel<model::Game>& game_model,
         run_asset_providers(ctx, m_providers);
         emit secondPhaseComplete(timer.restart());
 
-
-        HashMap<size_t, model::Game*> gameid_to_q_game;
-
-        build_ui_layer(ctx, parent()->thread(),
-                       game_model, collection_model, gameid_to_q_game);
+        HashMap<QString, model::Game*> path_map;
+        build_ui_layer(ctx, parent()->thread(), game_model, collection_model, path_map);
         emit staticDataReady();
 
-
         for (const auto& provider : m_providers)
-            provider->findDynamicData(game_model.asList(), collection_model.asList(), gameid_to_q_game);
+            provider->findDynamicData(game_model.asList(), collection_model.asList(), path_map);
         emit thirdPhaseComplete(timer.elapsed());
     });
 }

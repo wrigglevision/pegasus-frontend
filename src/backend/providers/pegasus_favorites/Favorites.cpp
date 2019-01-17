@@ -1,5 +1,5 @@
 // Pegasus Frontend
-// Copyright (C) 2017-2018  Mátyás Mustoha
+// Copyright (C) 2017-2019  Mátyás Mustoha
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -53,7 +53,7 @@ Favorites::Favorites(QString db_path, QObject* parent)
 
 void Favorites::findDynamicData(const QVector<model::Game*>&,
                                 const QVector<model::Collection*>&,
-                                const HashMap<QString, model::Game*>& modelgame_map)
+                                const HashMap<QString, model::Game*>& path_map)
 {
     if (!QFileInfo::exists(m_db_path))
         return;
@@ -72,8 +72,8 @@ void Favorites::findDynamicData(const QVector<model::Game*>&,
         if (line.startsWith('#'))
             continue;
 
-        if (modelgame_map.count(line))
-            modelgame_map.at(line)->setFavorite(true);
+        if (path_map.count(line))
+            path_map.at(line)->setFavorite(true);
     }
 }
 
@@ -84,8 +84,13 @@ void Favorites::onGameFavoriteChanged(const QVector<model::Game*>& game_list)
     m_pending_task.clear();
     m_pending_task << QStringLiteral("# List of favorites, one path per line");
     for (const model::Game* const game : game_list) {
-        if (game->data().is_favorite)
-            m_pending_task << game->data().fileinfo().canonicalFilePath();
+        if (game->data().is_favorite) {
+            for (const auto& entry : game->data().files) {
+                const QString path = QFileInfo(entry.first).canonicalFilePath();
+                if (!path.isEmpty())
+                    m_pending_task << path;
+            }
+        }
     }
 
     if (m_active_task.isEmpty())

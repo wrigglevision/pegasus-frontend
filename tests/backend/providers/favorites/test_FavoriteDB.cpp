@@ -1,5 +1,5 @@
 // Pegasus Frontend
-// Copyright (C) 2018  Mátyás Mustoha
+// Copyright (C) 2019  Mátyás Mustoha
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -155,8 +155,8 @@ void test_FavoriteDB::read()
     {
         QTextStream tmp_stream(&tmp_file);
         tmp_stream << QStringLiteral("# Favorite reader test") << endl;
-        tmp_stream << games[2]->data().fileinfo().canonicalFilePath() << endl;
-        tmp_stream << games[1]->data().fileinfo().canonicalFilePath() << endl;
+        tmp_stream << QFileInfo(games[2]->data().files.begin()->first).canonicalFilePath() << endl;
+        tmp_stream << QFileInfo(games[1]->data().files.begin()->first).canonicalFilePath() << endl;
         tmp_stream << QStringLiteral(":/somethingfake") << endl;
     }
     const QString db_path = tmp_file.fileName();
@@ -167,7 +167,7 @@ void test_FavoriteDB::read()
     QVector<model::Collection*> collections;
     HashMap<QString, model::Game*> modelgame_map;
     for (model::Game* const game : games)
-        modelgame_map.emplace(game->data().fileinfo().canonicalFilePath(), game);
+        modelgame_map.emplace(QFileInfo(game->data().files.begin()->first).canonicalFilePath(), game);
 
     favorite_db.findDynamicData(games, collections, modelgame_map);
 

@@ -55,7 +55,7 @@ public:
     /// Find data that may change during the runtime for all games
     virtual void findDynamicData(const QVector<model::Game*>&,
                                  const QVector<model::Collection*>&,
-                                 const HashMap<size_t, model::Game*>&) {}
+                                 const HashMap<QString, model::Game*>&) {}
 
 
     // events
