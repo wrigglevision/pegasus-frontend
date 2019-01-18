@@ -35,7 +35,6 @@ QString default_db_path()
 {
     return paths::writableConfigDir() + QStringLiteral("/favorites.txt");
 }
-
 } // namespace
 
 
@@ -84,10 +83,10 @@ void Favorites::onGameFavoriteChanged(const QVector<model::Game*>& game_list)
     m_pending_task.clear();
     m_pending_task << QStringLiteral("# List of favorites, one path per line");
     for (const model::Game* const game : game_list) {
-        if (game->data().is_favorite) {
-            for (const auto& entry : game->data().files) {
-                const QString path = QFileInfo(entry.first).canonicalFilePath();
-                if (!path.isEmpty())
+        if (game->favorite()) {
+            for (const model::GameFile* const file : game->filesConst()) {
+                const QString path = file->data().fileinfo.canonicalFilePath();
+                if (Q_LIKELY(!path.isEmpty()))
                     m_pending_task << path;
             }
         }

@@ -44,6 +44,7 @@ void test_FavoriteDB::write()
         new model::Game(modeldata::Game(QFileInfo(":/coll1dummy2")), this),
         new model::Game(modeldata::Game(QFileInfo(":/x/y/z/coll2dummy1")), this),
     };
+
     games.at(1)->setFavorite(true);
     games.at(2)->setFavorite(true);
 
@@ -155,8 +156,8 @@ void test_FavoriteDB::read()
     {
         QTextStream tmp_stream(&tmp_file);
         tmp_stream << QStringLiteral("# Favorite reader test") << endl;
-        tmp_stream << QFileInfo(games[2]->data().files.begin()->first).canonicalFilePath() << endl;
-        tmp_stream << QFileInfo(games[1]->data().files.begin()->first).canonicalFilePath() << endl;
+        tmp_stream << games[2]->filesConst().first()->data().fileinfo.canonicalFilePath() << endl;
+        tmp_stream << games[1]->filesConst().first()->data().fileinfo.canonicalFilePath() << endl;
         tmp_stream << QStringLiteral(":/somethingfake") << endl;
     }
     const QString db_path = tmp_file.fileName();
@@ -164,12 +165,14 @@ void test_FavoriteDB::read()
 
     providers::favorites::Favorites favorite_db(db_path);
 
-    QVector<model::Collection*> collections;
     HashMap<QString, model::Game*> modelgame_map;
-    for (model::Game* const game : games)
-        modelgame_map.emplace(QFileInfo(game->data().files.begin()->first).canonicalFilePath(), game);
+    for (model::Game* const game : games) {
+        const QString path = game->filesConst().first()->data().fileinfo.canonicalFilePath();
+        QVERIFY(!path.isEmpty());
+        modelgame_map.emplace(path, game);
+    }
 
-    favorite_db.findDynamicData(games, collections, modelgame_map);
+    favorite_db.findDynamicData(games, {}, modelgame_map);
 
     QVERIFY(!games[0]->data().is_favorite);
     QVERIFY(games[1]->data().is_favorite);
