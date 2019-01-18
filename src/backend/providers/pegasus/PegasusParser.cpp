@@ -40,8 +40,13 @@ FileFilter::FileFilter(QString collection, QString base_dir)
     Q_ASSERT(!directories.front().isEmpty());
 }
 
+FileFilterHelpers::FileFilterHelpers(const FileFilter& filter)
+    : rx_include(filter.include.regex)
+    , rx_exclude(filter.exclude.regex)
+{}
 
-Helpers::Helpers()
+
+ParserHelpers::ParserHelpers()
     : coll_attribs {
         { QStringLiteral("shortname"), CollAttrib::SHORT_NAME },
         { QStringLiteral("launch"), CollAttrib::LAUNCH_CMD },
@@ -100,7 +105,7 @@ Helpers::Helpers()
 {}
 
 
-ParserContext::ParserContext(QString file_path, OutputVars& outvars, const Helpers& helpers)
+ParserContext::ParserContext(QString file_path, OutputVars& outvars, const ParserHelpers& helpers)
     : metafile_path(std::move(file_path))
     , dir_path(QFileInfo(metafile_path).path())
     , outvars(outvars)

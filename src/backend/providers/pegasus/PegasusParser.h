@@ -72,7 +72,7 @@ struct FileFilterGroup {
     QStringList files;
     QString regex;
 
-    FileFilterGroup();
+    explicit FileFilterGroup();
     MOVE_ONLY(FileFilterGroup)
 };
 struct FileFilter {
@@ -82,17 +82,25 @@ struct FileFilter {
     FileFilterGroup include;
     FileFilterGroup exclude;
 
-    FileFilter(QString collection, QString base_dir);
+    explicit FileFilter(QString collection, QString base_dir);
     MOVE_ONLY(FileFilter)
+};
+struct FileFilterHelpers {
+    const QRegularExpression rx_include;
+    const QRegularExpression rx_exclude;
+
+    explicit FileFilterHelpers(const FileFilter&);
+    MOVE_ONLY(FileFilterHelpers)
 };
 
 struct OutputVars {
-    providers::SearchContext& sctx;
+    HashMap<QString, modeldata::Collection>& collections;
+    std::vector<modeldata::Game>& games;
     std::vector<FileFilter> filters;
     MOVE_ONLY(OutputVars)
 };
 
-struct Helpers {
+struct ParserHelpers {
     const HashMap<QString, CollAttrib> coll_attribs;
     const HashMap<QString, GameAttrib> game_attribs;
     //const HashMap<QString, GameFileAttrib> gamefile_attribs;
@@ -102,8 +110,8 @@ struct Helpers {
     const QRegularExpression rx_float;
     const QRegularExpression rx_date;
 
-    Helpers();
-    MOVE_ONLY(Helpers)
+    explicit ParserHelpers();
+    MOVE_ONLY(ParserHelpers)
 };
 
 struct ParserContext {
@@ -111,7 +119,7 @@ struct ParserContext {
     const QString dir_path;
 
     OutputVars& outvars;
-    const Helpers& helpers;
+    const ParserHelpers& helpers;
 
     modeldata::Collection* cur_coll;
     // NOTE: while these would be highly unsafe normally, we can use the fact
@@ -120,7 +128,7 @@ struct ParserContext {
     modeldata::Game* cur_game;
 
 
-    ParserContext(QString metafile_path, OutputVars&, const Helpers&);
+    explicit ParserContext(QString metafile_path, OutputVars&, const ParserHelpers&);
     MOVE_ONLY(ParserContext)
 
     void print_error(const int lineno, const QString msg) const;

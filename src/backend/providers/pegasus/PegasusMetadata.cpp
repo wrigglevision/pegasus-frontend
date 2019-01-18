@@ -146,15 +146,9 @@ void parse_game_entry(ParserContext& ctx, const config::Entry& entry)
     switch (ctx.helpers.game_attribs.at(entry.key)) {
         case GameAttrib::FILES:
             for (const QString& line : entry.values) {
-                QFileInfo finfo(line);
-                if (finfo.isRelative())
-                    finfo.setFile(ctx.dir_path % '/' % line);
-
-                const QString abs_path = finfo.absoluteFilePath();
-                const QString can_path = finfo.canonicalFilePath();
-
-                ctx.cur_game->files.emplace(abs_path, finfo);
-                ctx.outvars.sctx.path_to_gameidx[can_path] = ctx.outvars.sctx.games.size() - 1;
+                const QFileInfo fi(ctx.dir_path, line);
+                if (fi.exists())
+                    ctx.cur_game->files.emplace(fi.absoluteFilePath(), fi);
             }
             break;
         case GameAttrib::DEVELOPERS:
@@ -252,16 +246,14 @@ bool parse_asset_entry_maybe(ParserContext& ctx, const config::Entry& entry)
 
 void parse_entry(ParserContext& ctx, const config::Entry& entry)
 {
-    //qDebug() << "parsing" << entry.key << entry.values;
-
     // TODO: set cur_* by the return value of emplace
     if (entry.key == QLatin1String("collection")) {
         const QString& name = first_line_of(entry);
 
-        if (!ctx.outvars.sctx.collections.count(name))
-            ctx.outvars.sctx.collections.emplace(name, modeldata::Collection(name));
+        if (!ctx.outvars.collections.count(name))
+            ctx.outvars.collections.emplace(name, modeldata::Collection(name));
 
-        ctx.cur_coll = &ctx.outvars.sctx.collections.at(name);
+        ctx.cur_coll = &ctx.outvars.collections.at(name);
         ctx.cur_game = nullptr;
 
         ctx.outvars.filters.emplace_back(name, ctx.dir_path);
@@ -275,8 +267,8 @@ void parse_entry(ParserContext& ctx, const config::Entry& entry)
             game.launch_cmd = ctx.cur_coll->launch_cmd;
             game.launch_workdir = ctx.cur_coll->launch_workdir;
         }
-        ctx.outvars.sctx.games.emplace_back(std::move(game));
-        ctx.cur_game = &ctx.outvars.sctx.games.back();
+        ctx.outvars.games.emplace_back(std::move(game));
+        ctx.cur_game = &ctx.outvars.games.back();
         return;
     }
 
@@ -299,18 +291,7 @@ void parse_entry(ParserContext& ctx, const config::Entry& entry)
         parse_collection_entry(ctx, entry);
 }
 
-void tidy_filters(ParserContext& ctx)
-{
-    for (FileFilter& filter : ctx.outvars.filters) {
-        filter.directories.removeDuplicates();
-        filter.include.extensions.removeDuplicates();
-        filter.include.files.removeDuplicates();
-        filter.exclude.extensions.removeDuplicates();
-        filter.exclude.files.removeDuplicates();
-    }
-}
-
-void read_metafile(const QString& metafile_path, OutputVars& output, const Helpers& helpers)
+void read_metafile(const QString& metafile_path, OutputVars& output, const ParserHelpers& helpers)
 {
     ParserContext ctx(metafile_path, output, helpers);
 
@@ -326,10 +307,65 @@ void read_metafile(const QString& metafile_path, OutputVars& output, const Helpe
             << tr_log("Failed to read metadata file %1, file ignored").arg(metafile_path);
         return;
     }
-
-    tidy_filters(ctx);
 }
 
+// collect collection and game information
+void collect_metadata(const std::vector<QString>& dir_list, OutputVars& results)
+{
+    const ParserHelpers helpers;
+
+    for (const QString& dir_path : dir_list) {
+        const QString metafile = find_metafile_in(dir_path);
+        if (metafile.isEmpty())
+            continue;
+
+        read_metafile(metafile, results, helpers);
+    }
+}
+
+void remove_empty_games(std::vector<modeldata::Game>& games)
+{
+    auto it = std::remove_if(games.begin(), games.end(),
+        [](const modeldata::Game& game) { return game.files.empty(); });
+
+    for (auto printer_it = it; printer_it != games.end(); ++printer_it) {
+        qWarning().noquote() << MSG_PREFIX
+            << tr_log("No files defined for game '%1', ignored").arg(printer_it->title);
+    }
+
+    games.erase(it, games.end());
+}
+
+void build_path_map(const std::vector<modeldata::Game>& games,
+                    HashMap<QString, size_t>& path_to_gameidx)
+{
+    for (size_t i = 0; i < games.size(); i++) {
+        // empty games should have been removed already
+        Q_ASSERT(games[i].files.size() > 0);
+
+        for (const auto& entry : games[i].files) {
+            const QFileInfo fi(entry.first);
+            QString path = fi.canonicalFilePath();
+
+            // File s are added to the game only if they exist;
+            // the canonical path will be empty only if the file was deleted since this check
+            Q_ASSERT(!path.isEmpty());
+            if (Q_LIKELY(!path.isEmpty()))
+                path_to_gameidx.emplace(std::move(path), i);
+        }
+    }
+}
+
+void tidy_filters(std::vector<FileFilter>& filters)
+{
+    for (FileFilter& filter : filters) {
+        filter.directories.removeDuplicates();
+        filter.include.extensions.removeDuplicates();
+        filter.include.files.removeDuplicates();
+        filter.exclude.extensions.removeDuplicates();
+        filter.exclude.files.removeDuplicates();
+    }
+}
 
 // Find all dirs and subdirectories, but ignore 'media'
 QVector<QString> filter_find_dirs(const QString& filter_dir)
@@ -349,60 +385,74 @@ QVector<QString> filter_find_dirs(const QString& filter_dir)
     return result;
 }
 
-void process_filter(const FileFilter& filter, OutputVars& out)
+bool file_passes_filter(const QFileInfo& fileinfo, const FileFilter& filter, const QString filter_dir,
+                        const FileFilterHelpers& helpers)
+{
+    const QString relative_path = fileinfo.filePath().mid(filter_dir.length() + 1);
+
+    const bool exclude = filter.exclude.extensions.contains(fileinfo.suffix())
+        || filter.exclude.files.contains(relative_path)
+        || (!filter.exclude.regex.isEmpty() && helpers.rx_exclude.match(fileinfo.filePath()).hasMatch());
+    if (exclude)
+        return false;
+
+    const bool include = filter.include.extensions.contains(fileinfo.suffix())
+        || filter.include.files.contains(relative_path)
+        || (!filter.include.regex.isEmpty() && helpers.rx_include.match(fileinfo.filePath()).hasMatch());
+    if (!include)
+        return false;
+
+    return true;
+}
+
+void accept_filtered_file(const QFileInfo& fileinfo, const modeldata::Collection& parent,
+                          providers::SearchContext& sctx)
+{
+    const QString game_path = fileinfo.canonicalFilePath();
+    if (!sctx.path_to_gameidx.count(game_path)) {
+        // This means there weren't any game entries with matching file entry
+        // in any of the parsed metadata files. There is no existing game data
+        // created yet either.
+        modeldata::Game game(fileinfo);
+        game.launch_cmd = parent.launch_cmd;
+        game.launch_workdir = parent.launch_workdir;
+
+        sctx.path_to_gameidx.emplace(game_path, sctx.games.size());
+        sctx.games.emplace_back(std::move(game));
+    }
+    const size_t game_idx = sctx.path_to_gameidx.at(game_path);
+    sctx.collection_childs[parent.name].emplace_back(game_idx);
+
+    // When a game was defined earlier than its collection
+    modeldata::Game& game = sctx.games.at(game_idx);
+    if (game.launch_cmd.isEmpty())
+        game.launch_cmd = parent.launch_cmd;
+    if (game.launch_workdir.isEmpty())
+        game.launch_workdir = parent.launch_workdir;
+}
+
+void process_filters(const std::vector<FileFilter>& filters, providers::SearchContext& sctx)
 {
     constexpr auto entry_filters = QDir::Files | QDir::Dirs | QDir::Readable | QDir::NoDotAndDotDot;
     constexpr auto entry_flags = QDirIterator::FollowSymlinks;
 
-    const QRegularExpression include_regex(filter.include.regex);
-    const QRegularExpression exclude_regex(filter.exclude.regex);
+    for (const FileFilter& filter : filters) {
+        const modeldata::Collection& collection = sctx.collections.at(filter.collection_name);
+        const FileFilterHelpers helpers(filter);
 
+        for (const QString& filter_dir : filter.directories) {
+            // ie. all dirs and subdirs except /media
+            const QVector<QString> dirs_to_check = filter_find_dirs(filter_dir);
 
-    for (const QString& filter_dir : filter.directories)
-    {
-        //qDebug() << "Running filter for" << filter.collection_name << "in" << filter_dir;
-        const QVector<QString> dirs_to_check = filter_find_dirs(filter_dir);
-        for (const QString& subdir : dirs_to_check) {
-            QDirIterator subdir_it(subdir, entry_filters, entry_flags);
-            while (subdir_it.hasNext()) {
-                subdir_it.next();
-                QFileInfo fileinfo = subdir_it.fileInfo();
-                const QString relative_path = fileinfo.filePath().mid(filter_dir.length() + 1);
+            for (const QString& subdir : dirs_to_check) {
+                QDirIterator subdir_it(subdir, entry_filters, entry_flags);
+                while (subdir_it.hasNext()) {
+                    subdir_it.next();
+                    const QFileInfo fileinfo = subdir_it.fileInfo();
 
-                const bool exclude = filter.exclude.extensions.contains(fileinfo.suffix())
-                    || filter.exclude.files.contains(relative_path)
-                    || (!filter.exclude.regex.isEmpty() && exclude_regex.match(fileinfo.filePath()).hasMatch());
-                if (exclude)
-                    continue;
-
-                const bool include = filter.include.extensions.contains(fileinfo.suffix())
-                    || filter.include.files.contains(relative_path)
-                    || (!filter.include.regex.isEmpty() && include_regex.match(fileinfo.filePath()).hasMatch());
-                if (!include)
-                    continue;
-
-                const modeldata::Collection& parent = out.sctx.collections.at(filter.collection_name);
-                const QString game_path = fileinfo.canonicalFilePath();
-                if (!out.sctx.path_to_gameidx.count(game_path)) {
-                    // This means there weren't any game entries with matching file entry
-                    // in any of the parsed metadata files. There is no existing game data
-                    // created yet either.
-                    modeldata::Game game(fileinfo);
-                    game.launch_cmd = parent.launch_cmd;
-                    game.launch_workdir = parent.launch_workdir;
-
-                    out.sctx.path_to_gameidx.emplace(game_path, out.sctx.games.size());
-                    out.sctx.games.emplace_back(std::move(game));
+                    if (file_passes_filter(fileinfo, filter, filter_dir, helpers))
+                        accept_filtered_file(fileinfo, collection, sctx);
                 }
-                const size_t game_idx = out.sctx.path_to_gameidx.at(game_path);
-                out.sctx.collection_childs[filter.collection_name].emplace_back(game_idx);
-
-                // Corner case: a game was defined earlier than its collection
-                modeldata::Game& game = out.sctx.games.at(game_idx);
-                if (game.launch_cmd.isEmpty())
-                    game.launch_cmd = parent.launch_cmd;
-                if (game.launch_workdir.isEmpty())
-                    game.launch_workdir = parent.launch_workdir;
             }
         }
     }
@@ -416,27 +466,14 @@ namespace pegasus {
 
 void find_in_dirs(const std::vector<QString>& dir_list, providers::SearchContext& sctx)
 {
-    const Helpers helpers;
-    OutputVars output { sctx, {} };
+    OutputVars results { sctx.collections, sctx.games, {} };
+    collect_metadata(dir_list, results);
 
-    // collect collection and game information
-    for (const QString& dir_path : dir_list) {
-        const QString metafile = find_metafile_in(dir_path);
-        if (metafile.isEmpty())
-            continue;
+    remove_empty_games(sctx.games);
+    build_path_map(sctx.games, sctx.path_to_gameidx);
 
-        read_metafile(metafile, output, helpers);
-    }
-
-    // find the actually existing files and assign them to the data
-    for (const FileFilter& filter : output.filters)
-        process_filter(filter, output);
-
-    // remove empty games
-    // TODO: make this stricter and update the paths and collections on remove
-    auto it = std::remove_if(sctx.games.begin(), sctx.games.end(),
-        [](const modeldata::Game& game) { return game.launch_cmd.isEmpty() && game.files.empty(); });
-    sctx.games.erase(it, sctx.games.end());
+    tidy_filters(results.filters);
+    process_filters(results.filters, sctx);
 }
 
 } // namespace pegasus
