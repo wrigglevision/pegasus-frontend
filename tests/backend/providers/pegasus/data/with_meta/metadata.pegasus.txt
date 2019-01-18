@@ -48,7 +48,7 @@ files:
   multi.b.ext
 
 
-# Test launch-only entries
+# Launch-only entries are not supported at the moment
 game: Virtual Game
 launch: runme.exe param1 param2
 workdir: some/dir/here
@@ -56,7 +56,9 @@ workdir: some/dir/here
 
 # Check some more interesting cases
 game: Horse
+file: horse.ext
 launch: dummy
+workdir: my/work/dir
 rating: asd
 rating: 0.7
 release: 123465

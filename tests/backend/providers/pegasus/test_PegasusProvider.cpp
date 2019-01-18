@@ -134,16 +134,17 @@ void test_PegasusProvider::with_meta()
     providers::SearchContext ctx;
 
     QTest::ignoreMessage(QtInfoMsg, "Collections: found `:/with_meta/metadata.pegasus.txt`");
-    QTest::ignoreMessage(QtWarningMsg, "Collections: `:/with_meta/metadata.pegasus.txt`, line 60: failed to parse rating value");
-    QTest::ignoreMessage(QtWarningMsg, "Collections: `:/with_meta/metadata.pegasus.txt`, line 62: incorrect date format, should be YYYY, YYYY-MM or YYYY-MM-DD");
-    QTest::ignoreMessage(QtWarningMsg, "Collections: `:/with_meta/metadata.pegasus.txt`, line 63: incorrect date format, should be YYYY, YYYY-MM or YYYY-MM-DD");
-    QTest::ignoreMessage(QtWarningMsg, "Collections: `:/with_meta/metadata.pegasus.txt`, line 65: unrecognized game property `asd`, ignored");
+    QTest::ignoreMessage(QtWarningMsg, "Collections: `:/with_meta/metadata.pegasus.txt`, line 62: failed to parse rating value");
+    QTest::ignoreMessage(QtWarningMsg, "Collections: `:/with_meta/metadata.pegasus.txt`, line 64: incorrect date format, should be YYYY, YYYY-MM or YYYY-MM-DD");
+    QTest::ignoreMessage(QtWarningMsg, "Collections: `:/with_meta/metadata.pegasus.txt`, line 65: incorrect date format, should be YYYY, YYYY-MM or YYYY-MM-DD");
+    QTest::ignoreMessage(QtWarningMsg, "Collections: `:/with_meta/metadata.pegasus.txt`, line 67: unrecognized game property `asd`, ignored");
+    QTest::ignoreMessage(QtWarningMsg, "Collections: No files defined for game 'Virtual Game', ignored");
 
     providers::pegasus::PegasusProvider provider({QStringLiteral(":/with_meta")});
     provider.findLists(ctx);
 
     QCOMPARE(static_cast<int>(ctx.collections.size()), 1);
-    QCOMPARE(static_cast<int>(ctx.games.size()), 6);
+    QCOMPARE(static_cast<int>(ctx.games.size()), 5);
 
     const auto common_launch = QStringLiteral("launcher.exe \"{file.path}\"");
     const auto common_workdir = QStringLiteral("some/workdir");
@@ -228,28 +229,17 @@ void test_PegasusProvider::with_meta()
         QCOMPARE(game.launch_workdir, common_workdir);
     }
 
-    // Virtual
-    {
-        const auto it = std::find_if(ctx.games.cbegin(), ctx.games.cend(),
-            [](const modeldata::Game& game) { return game.title == QStringLiteral("Virtual Game"); });
-        QVERIFY(it != ctx.games.cend());
-
-        const modeldata::Game& game = *it;
-        QCOMPARE(static_cast<int>(game.files.size()), 0);
-        QCOMPARE(game.launch_cmd, QStringLiteral("runme.exe param1 param2"));
-        QCOMPARE(game.launch_workdir, QStringLiteral("some/dir/here"));
-    }
-
     // Other cases
     {
-        const auto it = std::find_if(ctx.games.cbegin(), ctx.games.cend(),
-            [](const modeldata::Game& game) { return game.title == QStringLiteral("Horse"); });
-        QVERIFY(it != ctx.games.cend());
+        const QString file_path = QStringLiteral(":/with_meta/horse.ext");
+        QVERIFY(ctx.path_to_gameidx.count(file_path));
+        const size_t game_idx = ctx.path_to_gameidx.at(file_path);
+        QVERIFY(game_idx < ctx.games.size());
 
-        const modeldata::Game& game = *it;
+        const modeldata::Game& game = ctx.games.at(game_idx);
         QCOMPARE(game.rating, 0.7f);
         QCOMPARE(game.launch_cmd, QStringLiteral("dummy"));
-        QCOMPARE(game.launch_workdir, common_workdir);
+        QCOMPARE(game.launch_workdir, QStringLiteral("my/work/dir"));
     }
 }
 
