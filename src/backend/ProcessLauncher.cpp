@@ -49,21 +49,18 @@ ProcessLauncher::ProcessLauncher(QObject* parent)
     , m_process(nullptr)
 {}
 
-void ProcessLauncher::onLaunchRequested(const model::Game* game, const QString file_abs_path)
+void ProcessLauncher::onLaunchRequested(const model::GameFile* gamefile)
 {
-    Q_ASSERT(game);
-    Q_ASSERT(file_abs_path.isEmpty() || game->data().files.count(file_abs_path));
+    Q_ASSERT(gamefile);
 
-    const QFileInfo finfo(file_abs_path);
+    auto game = static_cast<const model::Game* const>(gamefile->parent());
 
-    // TODO: in the future
-    /*if (!file_abs_path.isEmpty()) {
-        launch_cmd = game->data().files.at(file_abs_path).launch_cmd;
-    }*/
+    // TODO: in the future, check the gamefile's own launch command first
 
     QString launch_cmd = game->data().launch_cmd;
+
     if (!launch_cmd.isEmpty())
-        format_launch_command(launch_cmd, finfo);
+        format_launch_command(launch_cmd, gamefile->data().fileinfo);
 
     if (launch_cmd.isEmpty()) {
         qInfo().noquote()
@@ -76,7 +73,7 @@ void ProcessLauncher::onLaunchRequested(const model::Game* game, const QString f
 
     QString workdir = game->data().launch_workdir;
     if (workdir.isEmpty())
-        workdir = finfo.absolutePath();
+        workdir = gamefile->data().fileinfo.absolutePath();
 
 
     beforeRun();

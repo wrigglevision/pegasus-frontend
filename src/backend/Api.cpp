@@ -22,7 +22,7 @@
 
 ApiObject::ApiObject(QObject* parent)
     : QObject(parent)
-    , m_launch_game(nullptr)
+    , m_launch_game_file(nullptr)
     , m_providerman(this)
 {
     connect(&m_memory, &model::Memory::dataChanged,
@@ -57,8 +57,8 @@ void ApiObject::onStaticDataLoaded()
     qInfo().noquote() << tr_log("%1 games found").arg(m_allGames.count());
 
     for (model::Game* game : m_allGames) {
-        connect(game, &model::Game::launchRequested,
-                this, &ApiObject::onGameLaunchRequested);
+        connect(game, &model::Game::launchFileSelectorRequested,
+                this, &ApiObject::onGameFileSelectorRequested);
         connect(game, &model::Game::favoriteChanged,
                 this, &ApiObject::onGameFavoriteChanged);
 
@@ -71,57 +71,39 @@ void ApiObject::onStaticDataLoaded()
     m_internal.meta().onUiReady();
 }
 
-void ApiObject::onGameLaunchRequested()
+void ApiObject::onGameFileSelectorRequested()
 {
-    // avoid launch spamming
-    if (m_launch_game)
-        return;
-
-    m_launch_game = static_cast<model::Game*>(QObject::sender());
-    m_launch_game_file.clear();
-
-    if (m_launch_game->files()->size() > 1) {
-        emit launchSelectFile(m_launch_game);
-        return;
-    }
-
-    if (m_launch_game->files()->size() == 1)
-        m_launch_game_file = m_launch_game->files()->first()->path();
-
-    // if m_launch_game_file is empty, the game's launch command will be used
-    emit launchGame(m_launch_game, m_launch_game_file);
+    // TODO
 }
 
 void ApiObject::onGameFileLaunchRequested()
 {
-    if (m_launch_game)
+    if (m_launch_game_file)
         return;
 
-    const auto gamefile = static_cast<model::GameFile*>(QObject::sender());
-    m_launch_game = static_cast<model::Game*>(gamefile->parent());
-    m_launch_game_file = gamefile->path();
-    emit launchGame(m_launch_game, m_launch_game_file);
+    m_launch_game_file = static_cast<model::GameFile*>(QObject::sender());
+    emit launchGame(m_launch_game_file);
 }
 
 void ApiObject::onGameLaunchOk()
 {
-    Q_ASSERT(m_launch_game);
-    m_providerman.onGameLaunched(m_launch_game);
+    Q_ASSERT(m_launch_game_file);
+    m_providerman.onGameLaunched(m_launch_game_file);
 }
 
 void ApiObject::onGameLaunchError()
 {
     // TODO: show error
-    Q_ASSERT(m_launch_game);
-    m_launch_game = nullptr;
+    Q_ASSERT(m_launch_game_file);
+    m_launch_game_file = nullptr;
 }
 
 void ApiObject::onGameFinished()
 {
-    Q_ASSERT(m_launch_game);
+    Q_ASSERT(m_launch_game_file);
 
-    m_providerman.onGameFinished(m_launch_game);
-    m_launch_game = nullptr;
+    m_providerman.onGameFinished(m_launch_game_file);
+    m_launch_game_file = nullptr;
 }
 
 void ApiObject::onGameFavoriteChanged()

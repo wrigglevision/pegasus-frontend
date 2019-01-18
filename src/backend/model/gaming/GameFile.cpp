@@ -2,14 +2,13 @@
 
 
 namespace model {
-GameFile::GameFile(QString path, modeldata::GameFile data, QObject* parent)
+GameFile::GameFile(modeldata::GameFile data, QObject* parent)
     : QObject(parent)
-    , m_path(std::move(path))
     , m_data(std::move(data))
 {}
 
 void GameFile::launch()
 {
-    emit
+    emit launchRequested();
 }
 } // namespace model

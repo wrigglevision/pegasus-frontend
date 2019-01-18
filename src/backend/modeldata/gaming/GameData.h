@@ -31,6 +31,7 @@
 namespace modeldata {
 
 struct GameFile {
+    QFileInfo fileinfo;
     QString name;
     // TODO: in the future...
     // QString summary;
@@ -38,13 +39,13 @@ struct GameFile {
     // QString launch_cmd;
     // QString launch_workdir;
 
-    explicit GameFile(const QFileInfo&);
+    explicit GameFile(QFileInfo);
     MOVE_ONLY(GameFile)
 };
 
 struct Game {
-    explicit Game(const QFileInfo&);
-    explicit Game(QString title);
+    explicit Game(QFileInfo);
+    explicit Game(QString);
     MOVE_ONLY(Game)
 
     QString title;

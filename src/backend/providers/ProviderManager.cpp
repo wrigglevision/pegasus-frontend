@@ -205,7 +205,7 @@ void ProviderManager::onGameFavoriteChanged(const QVector<model::Game*>& all_gam
         provider->onGameFavoriteChanged(all_games);
 }
 
-void ProviderManager::onGameLaunched(model::Game* const game)
+void ProviderManager::onGameLaunched(model::GameFile* const game)
 {
     if (m_init_seq.isRunning())
         return;
@@ -214,7 +214,7 @@ void ProviderManager::onGameLaunched(model::Game* const game)
         provider->onGameLaunched(game);
 }
 
-void ProviderManager::onGameFinished(model::Game* const game)
+void ProviderManager::onGameFinished(model::GameFile* const game)
 {
     if (m_init_seq.isRunning())
         return;

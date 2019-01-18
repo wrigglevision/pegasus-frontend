@@ -84,13 +84,10 @@ public:
     void addPlayStats(int playcount, qint64 playtime, const QDateTime& last_played);
     void updatePlayStats(qint64 duration, QDateTime time_finished);
 
-signals:
-    void launchRequested(model::Game*);
+public:
+    // a workaround for const pointer issues with the model
+    const QVector<model::GameFile*>& filesConst() const { return m_files.asList(); }
 
-    void favoriteChanged();
-    void playStatsChanged();
-
-private:
     QString developerString() const { return joined_list(m_game.developers); }
     QString publisherString() const { return joined_list(m_game.publishers); }
     QString genreString() const { return joined_list(m_game.genres); }
@@ -101,6 +98,11 @@ private:
     const QDateTime& lastPlayed() const { return m_game.last_played; }
 
     GameAssets* assetsPtr() { return &m_assets; }
+
+signals:
+    void launchFileSelectorRequested();
+    void favoriteChanged();
+    void playStatsChanged();
 
 private:
     modeldata::Game m_game;

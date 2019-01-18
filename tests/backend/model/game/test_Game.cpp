@@ -29,7 +29,8 @@ private slots:
     void genres();
     void release();
 
-    void launch();
+    void launchSingle();
+    void launchMulti();
 };
 
 void testStrAndList(std::function<void(modeldata::Game&, const QString&)> fn_add,
@@ -76,14 +77,29 @@ void test_Game::release()
     QCOMPARE(game.property("releaseDay").toInt(), 2);
 }
 
-void test_Game::launch()
+void test_Game::launchSingle()
 {
-    model::Game game(modeldata::Game("test"));
+    modeldata::Game gamedata("test");
+    gamedata.files.emplace("a", modeldata::GameFile(QFileInfo("test")));
+    model::Game game(std::move(gamedata));
 
-    QSignalSpy spy_launch(&game, &model::Game::launchRequested);
+    QSignalSpy spy_launch(game.files()->first(), &model::GameFile::launchRequested);
     QVERIFY(spy_launch.isValid());
 
-    // FIXME: "Unable to handle parameter '' of type ..."
+    QMetaObject::invokeMethod(&game, "launch");
+    QVERIFY(spy_launch.count() == 1 || spy_launch.wait());
+}
+
+void test_Game::launchMulti()
+{
+    modeldata::Game gamedata("test");
+    gamedata.files.emplace("a", modeldata::GameFile(QFileInfo("test1")));
+    gamedata.files.emplace("b", modeldata::GameFile(QFileInfo("test2")));
+    model::Game game(std::move(gamedata));
+
+    QSignalSpy spy_launch(&game, &model::Game::launchFileSelectorRequested);
+    QVERIFY(spy_launch.isValid());
+
     QMetaObject::invokeMethod(&game, "launch");
     QVERIFY(spy_launch.count() == 1 || spy_launch.wait());
 }

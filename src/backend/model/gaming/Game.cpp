@@ -26,10 +26,8 @@ Game::Game(modeldata::Game game, QObject* parent)
     , m_game(std::move(game))
     , m_assets(&m_game.assets, this)
 {
-    // Q_ASSERT(!m_game.launch_cmd.isEmpty());
-
     for (auto& entry : m_game.files)
-        m_files.append(new model::GameFile(entry.first, std::move(entry.second), this));
+        m_files.append(new model::GameFile(std::move(entry.second), this));
 
     m_game.files.clear();
 }
@@ -60,7 +58,12 @@ void Game::updatePlayStats(qint64 duration, QDateTime time_finished)
 
 void Game::launch()
 {
-    emit launchRequested(this);
+    Q_ASSERT(m_files.count() > 0);
+
+    if (m_files.count() == 1)
+        m_files.first()->launch();
+    else
+        emit launchFileSelectorRequested();
 }
 
 } // namespace model

@@ -30,15 +30,18 @@ QString pretty_filename(const QFileInfo& fi)
 
 namespace modeldata {
 
-GameFile::GameFile(const QFileInfo& fi)
-    : name(pretty_filename(fi))
+GameFile::GameFile(QFileInfo fi)
+    : fileinfo(std::move(fi))
+    , name(pretty_filename(fileinfo))
 {}
 
-Game::Game(const QFileInfo& fi)
+Game::Game(QFileInfo fi)
     : Game(pretty_filename(fi))
 {
+    QString path = fi.absoluteFilePath();
+    Q_ASSERT(!path.isEmpty());
     // TODO: one call to the prettifier could be optimized out here
-    files.emplace(fi.absoluteFilePath(), GameFile(fi));
+    files.emplace(std::move(path), GameFile(std::move(fi)));
 }
 
 Game::Game(QString title)

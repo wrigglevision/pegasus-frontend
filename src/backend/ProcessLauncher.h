@@ -38,7 +38,7 @@ signals:
     void processFinished();
 
 public slots:
-    void onLaunchRequested(const model::Game*, const QString);
+    void onLaunchRequested(const model::GameFile*);
     void onTeardownComplete();
 
 private slots:

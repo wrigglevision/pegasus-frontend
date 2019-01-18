@@ -6,34 +6,26 @@
 #include <QString>
 
 
-#define DATA_CONSTREF(Type, name) \
-    private: Q_PROPERTY(Type name READ name CONSTANT) \
-    public: const Type& name() const { return m_data.name; }
-
-#define MEMBER_CONSTREF(Type, name) \
-    private: Q_PROPERTY(Type name READ name CONSTANT) \
-    public: const Type& name() const { return m_##name; }
-
-
 namespace model {
 class GameFile : public QObject {
     Q_OBJECT
-    DATA_CONSTREF(QString, name)
-    MEMBER_CONSTREF(QString, path)
+    Q_PROPERTY(QString name READ name CONSTANT)
+    Q_PROPERTY(QString path READ path CONSTANT)
 
 public:
-    explicit GameFile(QString, modeldata::GameFile, QObject*);
+    explicit GameFile(modeldata::GameFile, QObject*);
 
     Q_INVOKABLE void launch();
+
+    const modeldata::GameFile& data() const { return m_data; }
+
+    const QString& name() const { return m_data.name; }
+    QString path() const { return m_data.fileinfo.filePath(); }
 
 signals:
     void launchRequested();
 
 private:
-    const QString m_path;
     const modeldata::GameFile m_data;
 };
 } // namespace model
-
-#undef DATA_CONSTREF
-#undef MEMBER_CONSTREF

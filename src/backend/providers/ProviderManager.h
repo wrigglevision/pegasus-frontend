@@ -37,8 +37,8 @@ public:
     size_t providerCount() const { return m_providers.size(); }
 
     void startSearch(QQmlObjectListModel<model::Game>&, QQmlObjectListModel<model::Collection>&);
-    void onGameLaunched(model::Game* const);
-    void onGameFinished(model::Game* const);
+    void onGameLaunched(model::GameFile* const);
+    void onGameFinished(model::GameFile* const);
     void onGameFavoriteChanged(const QVector<model::Game*>&);
 
 signals:
