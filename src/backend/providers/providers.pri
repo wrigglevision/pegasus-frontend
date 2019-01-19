@@ -11,6 +11,7 @@ SOURCES += \
 
 include(pegasus/pegasus.pri)
 include(pegasus_favorites/favorites.pri)
+include(pegasus_playtime/playtime.pri)
 
 contains(QMAKE_CXX, ".*arm.*")|contains(QMAKE_CXX, ".*aarch.*"): target_arm = yes
 unix:!macx:!android:!defined(target_arm, var): pclinux = yes
