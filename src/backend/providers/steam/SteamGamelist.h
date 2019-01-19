@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "providers/Provider.h"
 #include "utils/FwdDeclModelData.h"
 #include "utils/HashMap.h"
 
@@ -32,9 +33,7 @@ class Gamelist : public QObject {
 public:
     explicit Gamelist(QObject* parent);
 
-    void find(HashMap<QString, modeldata::Game>& games,
-              HashMap<QString, modeldata::Collection>& collections,
-              HashMap<QString, std::vector<QString>>& collection_childs);
+    void find(providers::SearchContext&);
 
 signals:
     void gameCountChanged(int count);

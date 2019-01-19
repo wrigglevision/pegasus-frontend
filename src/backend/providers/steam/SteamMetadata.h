@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "providers/Provider.h"
 #include "utils/FwdDeclModelData.h"
 #include "utils/HashMap.h"
 
@@ -32,9 +33,7 @@ class Metadata : public QObject {
 public:
     explicit Metadata(QObject* parent);
 
-    void enhance(HashMap<QString, modeldata::Game>&,
-                 const HashMap<QString, modeldata::Collection>&,
-                 const HashMap<QString, std::vector<QString>>&);
+    void enhance(providers::SearchContext&);
 };
 
 } // namespace steam

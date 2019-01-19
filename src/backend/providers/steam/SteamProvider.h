@@ -29,14 +29,10 @@ class SteamProvider : public Provider {
     Q_OBJECT
 
 public:
-    SteamProvider(QObject* parent = nullptr);
+    explicit SteamProvider(QObject* parent = nullptr);
 
-    void findLists(HashMap<QString, modeldata::Game>&,
-                   HashMap<QString, modeldata::Collection>&,
-                   HashMap<QString, std::vector<QString>>&) final;
-    void findStaticData(HashMap<QString, modeldata::Game>&,
-                        const HashMap<QString, modeldata::Collection>&,
-                        const HashMap<QString, std::vector<QString>>&) final;
+    void findLists(providers::SearchContext&) final;
+    void findStaticData(providers::SearchContext&) final;
 
 private:
     Gamelist gamelist;

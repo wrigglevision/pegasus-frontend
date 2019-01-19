@@ -30,18 +30,14 @@ SteamProvider::SteamProvider(QObject* parent)
             this, &SteamProvider::gameCountChanged);
 }
 
-void SteamProvider::findLists(HashMap<QString, modeldata::Game>& games,
-                              HashMap<QString, modeldata::Collection>& collections,
-                              HashMap<QString, std::vector<QString>>& collection_childs)
+void SteamProvider::findLists(providers::SearchContext& ctx)
 {
-    gamelist.find(games, collections, collection_childs);
+    gamelist.find(ctx);
 }
 
-void SteamProvider::findStaticData(HashMap<QString, modeldata::Game>& games,
-                                   const HashMap<QString, modeldata::Collection>& collections,
-                                   const HashMap<QString, std::vector<QString>>& collection_childs)
+void SteamProvider::findStaticData(providers::SearchContext& ctx)
 {
-    metadata.enhance(games, collections, collection_childs);
+    metadata.enhance(ctx);
 }
 
 } // namespace steam
