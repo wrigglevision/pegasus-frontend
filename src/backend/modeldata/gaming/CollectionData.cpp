@@ -22,8 +22,8 @@
 
 namespace modeldata {
 
-Collection::Collection(QString name)
-    : name(std::move(name))
+Collection::Collection(QString in_name)
+    : name(std::move(in_name))
     , m_short_name(name.toLower())
 {}
 
