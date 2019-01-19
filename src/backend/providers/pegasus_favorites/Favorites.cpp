@@ -50,9 +50,9 @@ Favorites::Favorites(QString db_path, QObject* parent)
     , m_db_path(std::move(db_path))
 {}
 
-void Favorites::findDynamicData(const QVector<model::Game*>&,
-                                const QVector<model::Collection*>&,
-                                const HashMap<QString, model::Game*>& path_map)
+void Favorites::findDynamicData(const QVector<model::Collection*>&,
+                                const QVector<model::Game*>&,
+                                const HashMap<QString, model::GameFile*>& path_map)
 {
     if (!QFileInfo::exists(m_db_path))
         return;
@@ -71,8 +71,10 @@ void Favorites::findDynamicData(const QVector<model::Game*>&,
         if (line.startsWith('#'))
             continue;
 
-        if (path_map.count(line))
-            path_map.at(line)->setFavorite(true);
+        if (path_map.count(line)) {
+            auto parent = static_cast<model::Game* const>(path_map.at(line)->parent());
+            parent->setFavorite(true);
+        }
     }
 }
 

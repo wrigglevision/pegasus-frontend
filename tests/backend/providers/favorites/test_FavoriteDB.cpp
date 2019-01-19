@@ -1,5 +1,5 @@
 // Pegasus Frontend
-// Copyright (C) 2019  Mátyás Mustoha
+// Copyright (C) 2017-2019  Mátyás Mustoha
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -165,14 +165,15 @@ void test_FavoriteDB::read()
 
     providers::favorites::Favorites favorite_db(db_path);
 
-    HashMap<QString, model::Game*> modelgame_map;
-    for (model::Game* const game : games) {
-        const QString path = game->filesConst().first()->data().fileinfo.canonicalFilePath();
+    HashMap<QString, model::GameFile*> path_map;
+    for (const model::Game* const game : games) {
+        model::GameFile* const gamefile = game->filesConst().first();
+        QString path = gamefile->data().fileinfo.canonicalFilePath();
         QVERIFY(!path.isEmpty());
-        modelgame_map.emplace(path, game);
+        path_map.emplace(std::move(path), gamefile);
     }
 
-    favorite_db.findDynamicData(games, {}, modelgame_map);
+    favorite_db.findDynamicData({}, games, path_map);
 
     QVERIFY(!games[0]->data().is_favorite);
     QVERIFY(games[1]->data().is_favorite);

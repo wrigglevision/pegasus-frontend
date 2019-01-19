@@ -83,17 +83,17 @@ void run_asset_providers(providers::SearchContext& ctx, const std::vector<Provid
 
 void build_ui_layer(providers::SearchContext& ctx,
                     QThread* const ui_thread,
-                    QQmlObjectListModel<model::Game>& game_model,
                     QQmlObjectListModel<model::Collection>& collection_model,
-                    HashMap<QString, model::Game*>& path_map)
+                    QQmlObjectListModel<model::Game>& game_model,
+                    HashMap<QString, model::GameFile*>& path_map)
 {
     QVector<model::Game*> q_games;
     q_games.reserve(static_cast<int>(ctx.games.size()));
 
-    for (size_t i = 0; i < ctx.games.size(); i++) {
-        auto qobj = new model::Game(std::move(ctx.games[i]));
-        qobj->moveToThread(ui_thread);
-        q_games.append(qobj);
+    for (modeldata::Game& game : ctx.games) {
+        auto q_game = new model::Game(std::move(game));
+        q_game->moveToThread(ui_thread);
+        q_games.append(q_game);
     }
 
 
@@ -101,20 +101,23 @@ void build_ui_layer(providers::SearchContext& ctx,
     q_collections.reserve(static_cast<int>(ctx.collections.size()));
 
     for (auto& keyval : ctx.collections) {
-        auto qobj = new model::Collection(std::move(keyval.second));
-        qobj->moveToThread(ui_thread);
-        q_collections.append(qobj);
+        auto q_coll = new model::Collection(std::move(keyval.second));
+        q_coll->moveToThread(ui_thread);
+        q_collections.append(q_coll);
     }
+
     sort_collections(q_collections);
     collection_model.append(q_collections);
 
 
     for (model::Collection* const q_coll : q_collections) {
-        QVector<model::Game*> q_childs;
+        const std::vector<size_t>& game_indices = ctx.collection_childs[q_coll->name()];
 
-        const std::vector<size_t>& game_keys = ctx.collection_childs[q_coll->name()];
-        for (size_t game_key : game_keys)
-            q_childs.append(q_games.at(static_cast<int>(game_key)));
+        QVector<model::Game*> q_childs;
+        q_childs.reserve(static_cast<int>(game_indices.size()));
+
+        for (size_t game_idx : game_indices)
+            q_childs.append(q_games.at(static_cast<int>(game_idx)));
 
         sort_games(q_childs);
         q_coll->setGameList(q_childs);
@@ -123,9 +126,14 @@ void build_ui_layer(providers::SearchContext& ctx,
 
     path_map.reserve(ctx.path_to_gameidx.size());
     for (auto entry : ctx.path_to_gameidx) {
-        Q_ASSERT(entry.second < ctx.games.size());
-        model::Game* q_game = q_games.at(static_cast<int>(entry.second));
-        path_map.emplace(entry.first, q_game);
+        const model::Game* const q_game = q_games.at(static_cast<int>(entry.second));
+
+        for (model::GameFile* const q_gamefile : q_game->filesConst()) {
+            QString path = q_gamefile->data().fileinfo.canonicalFilePath();
+            Q_ASSERT(!path.isEmpty());
+            if (Q_LIKELY(!path.isEmpty()))
+                path_map.emplace(std::move(path), q_gamefile);
+        }
     }
 
 
@@ -186,12 +194,12 @@ void ProviderManager::startSearch(QQmlObjectListModel<model::Game>& game_model,
         run_asset_providers(ctx, m_providers);
         emit secondPhaseComplete(timer.restart());
 
-        HashMap<QString, model::Game*> path_map;
-        build_ui_layer(ctx, parent()->thread(), game_model, collection_model, path_map);
+        HashMap<QString, model::GameFile*> path_map;
+        build_ui_layer(ctx, parent()->thread(), collection_model, game_model, path_map);
         emit staticDataReady();
 
         for (const auto& provider : m_providers)
-            provider->findDynamicData(game_model.asList(), collection_model.asList(), path_map);
+            provider->findDynamicData(collection_model.asList(), game_model.asList(), path_map);
         emit thirdPhaseComplete(timer.elapsed());
     });
 }

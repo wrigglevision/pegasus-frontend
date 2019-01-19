@@ -53,9 +53,9 @@ public:
 
     /// Initialization third stage:
     /// Find data that may change during the runtime for all games
-    virtual void findDynamicData(const QVector<model::Game*>&,
-                                 const QVector<model::Collection*>&,
-                                 const HashMap<QString, model::Game*>&) {}
+    virtual void findDynamicData(const QVector<model::Collection*>&,
+                                 const QVector<model::Game*>&,
+                                 const HashMap<QString, model::GameFile*>&) {}
 
 
     // events
