@@ -147,8 +147,8 @@ ProviderManager::ProviderManager(QObject* parent)
     : QObject(parent)
 {
     m_providers.emplace_back(new providers::pegasus::PegasusProvider());
-    //m_providers.emplace_back(new providers::favorites::Favorites());
-    //m_providers.emplace_back(new providers::playtime::PlaytimeStats());
+    m_providers.emplace_back(new providers::favorites::Favorites());
+    m_providers.emplace_back(new providers::playtime::PlaytimeStats());
 #ifdef WITH_COMPAT_STEAM
     if (AppSettings::ext_providers.at(ExtProvider::STEAM).enabled)
         m_providers.emplace_back(new providers::steam::SteamProvider());

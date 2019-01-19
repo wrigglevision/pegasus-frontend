@@ -18,7 +18,7 @@
 #pragma once
 
 #include "providers/pegasus/PegasusProvider.h"
-/*#include "providers/pegasus_favorites/Favorites.h"
+#include "providers/pegasus_favorites/Favorites.h"
 #include "providers/pegasus_playtime/PlaytimeStats.h"
 
 #ifdef WITH_COMPAT_ES2
@@ -31,12 +31,14 @@
 
 #ifdef WITH_COMPAT_GOG
   #include "providers/gog/GogProvider.h"
-#endif*/
+#endif
 
 #ifdef WITH_COMPAT_ANDROIDAPPS
   #include "providers/android_apps/AndroidAppsProvider.h"
 #endif
 
-/*#ifdef WITH_COMPAT_SKRAPER
+#ifdef WITH_COMPAT_SKRAPER
   #include "providers/skraper/SkraperAssetsProvider.h"
-#endif*/
+#endif
+
+// TODO: return std::vector<Provider*>
