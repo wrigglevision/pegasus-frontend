@@ -25,7 +25,6 @@
 #include "PegasusUtils.h"
 #include "modeldata/gaming/CollectionData.h"
 #include "modeldata/gaming/GameData.h"
-#include "utils/ParserTools.h"
 #include "utils/PathCheck.h"
 
 #include <QDebug>
