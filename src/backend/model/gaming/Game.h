@@ -1,5 +1,5 @@
 // Pegasus Frontend
-// Copyright (C) 2017-2018  Mátyás Mustoha
+// Copyright (C) 2017-2019  Mátyás Mustoha
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -81,8 +81,6 @@ public:
 
     const modeldata::Game& data() const { return m_game; }
     void setFavorite(bool);
-    void addPlayStats(int playcount, qint64 playtime, const QDateTime& last_played);
-    void updatePlayStats(qint64 duration, QDateTime time_finished);
 
 public:
     // a workaround for const pointer issues with the model
@@ -93,9 +91,9 @@ public:
     QString genreString() const { return joined_list(m_game.genres); }
 
     bool favorite() const { return m_game.is_favorite; }
-    int playCount() const { return m_game.playcount; }
-    qint64 playTime() const { return m_game.playtime; }
-    const QDateTime& lastPlayed() const { return m_game.last_played; }
+    int playCount() const;
+    qint64 playTime() const;
+    QDateTime lastPlayed() const;
 
     GameAssets* assetsPtr() { return &m_assets; }
 

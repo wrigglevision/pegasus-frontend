@@ -39,6 +39,10 @@ struct GameFile {
     // QString launch_cmd;
     // QString launch_workdir;
 
+    QDateTime last_played;
+    qint64 play_time;
+    int play_count;
+
     explicit GameFile(QFileInfo);
     MOVE_ONLY(GameFile)
 };
@@ -56,14 +60,10 @@ struct Game {
     QString launch_workdir;
     HashMap<QString, GameFile> files;
 
-    int player_count;
+    short player_count;
     bool is_favorite;
     float rating;
     QDate release_date;
-
-    int playcount;
-    qint64 playtime;
-    QDateTime last_played;
 
     QStringList developers;
     QStringList publishers;

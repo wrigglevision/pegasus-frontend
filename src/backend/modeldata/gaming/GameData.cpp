@@ -33,6 +33,8 @@ namespace modeldata {
 GameFile::GameFile(QFileInfo fi)
     : fileinfo(std::move(fi))
     , name(pretty_filename(fileinfo))
+    , play_time(0)
+    , play_count(0)
 {}
 
 Game::Game(QFileInfo fi)
@@ -45,12 +47,10 @@ Game::Game(QFileInfo fi)
 }
 
 Game::Game(QString title)
-    : title(title)
+    : title(std::move(title))
     , player_count(1)
     , is_favorite(false)
     , rating(0.f)
-    , playcount(0)
-    , playtime(0)
 {}
 
 } // namespace modeldata
